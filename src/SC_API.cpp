@@ -5,6 +5,7 @@
 #include <list>
 #include <stdio.h>
 #include <llvm/Support/Host.h>
+#include <llvm/IR/Verifier.h>
 
 
 static std::string			s_lastErrMsg;
@@ -179,7 +180,7 @@ void* KSC_GetFunctionPtr(FunctionHandle hFunc, bool bDump)
 		wrapperF->dump();
 	}
 
-	if (!llvm::verifyFunction(*wrapperF, llvm::PrintMessageAction)) {
+	if (!llvm::verifyFunction(*wrapperF)) {
 		SC::CG_Context::TheFPM->run(*wrapperF);
 		if (bDump) {
 			printf("------------- Function after FPM optimization ------------------------\n");
@@ -427,7 +428,7 @@ int KSC_GetSIMDWidth()
 	int CPUInfo[4];
 	__cpuid(CPUInfo, 1);
 
-	bool hasSSE = (CPUInfo[3] & (1 << 25));
+	bool hasSSE = (CPUInfo[3] & (1 << 25)) ? true : false;
 	const unsigned AVXBits = (1 << 27) | (1 << 28);
 	bool HasAVX = ((CPUInfo[2] & AVXBits) == AVXBits);
 
