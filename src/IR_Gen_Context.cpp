@@ -24,7 +24,7 @@ bool InitializeCodeGen()
 
 	// Set up the optimizer pipeline.  Start with registering info about how the
 	// target lays out data structures.
-	//CG_Context::TheDataLayout = new DataLayout(*CG_Context::TheExecutionEngine->getDataLayout());
+	CG_Context::TheDataLayout = new DataLayout(*CG_Context::TheExecutionEngine->getDataLayout());
 	//CG_Context::TheFPM->add(CG_Context::TheDataLayout);
 	// Provide basic AliasAnalysis support for GVN.
 	CG_Context::TheFPM->add(createBasicAliasAnalysisPass());
@@ -47,6 +47,9 @@ bool InitializeCodeGen()
 	// the sybmoll searching(e.g. for standard CRT) is disabled
 	CG_Context::TheExecutionEngine->DisableSymbolSearching(true);
 
+	llvm::InitializeNativeTarget(); 
+	InitializeNativeTargetAsmPrinter();
+    LLVMLinkInMCJIT(); 
 
 	return true;
 }
