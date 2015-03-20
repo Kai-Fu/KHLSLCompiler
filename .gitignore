@@ -19,6 +19,9 @@ bld/
 [Bb]in/
 [Oo]bj/
 
+# 3rd party SDK folders
+llvm_sdk/
+
 # Roslyn cache directories
 *.ide/
 
