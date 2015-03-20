@@ -41,9 +41,9 @@ void Initialize_AST_Gen()
 	s_BuiltInTypes["void"] = TypeDesc(kVoid, 0, true);
 
 	int machine_opt_width = KSC_GetSIMDWidth();
-	s_BuiltInTypes["float_n"] = TypeDesc(VarType(kFloat + machine_opt_width - 1), machine_opt_width, false);
-	s_BuiltInTypes["int_n"] = TypeDesc(VarType(kInt + machine_opt_width - 1), machine_opt_width, false);
-	s_BuiltInTypes["bool_n"] = TypeDesc(VarType(kBoolean + machine_opt_width - 1), machine_opt_width, false);
+	//s_BuiltInTypes["float_n"] = TypeDesc(VarType(kFloat + machine_opt_width - 1), machine_opt_width, false);
+	//s_BuiltInTypes["int_n"] = TypeDesc(VarType(kInt + machine_opt_width - 1), machine_opt_width, false);
+	//s_BuiltInTypes["bool_n"] = TypeDesc(VarType(kBoolean + machine_opt_width - 1), machine_opt_width, false);
 
 	s_KeyWords["struct"] = kStructDef;
 	s_KeyWords["if"] = kIf;
