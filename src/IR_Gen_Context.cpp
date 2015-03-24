@@ -1,4 +1,8 @@
 #include "IR_Gen_Context.h"
+#include <llvm/ADT/Triple.h>
+#include <llvm/Support/Host.h>
+#include <llvm/ExecutionEngine/RTDyldMemoryManager.h>
+#include <llvm/ExecutionEngine/SectionMemoryManager.h>
 
 namespace SC {
 
@@ -12,10 +16,20 @@ std::hash_map<std::string, void*> CG_Context::sGlobalFuncSymbols;
 bool InitializeCodeGen()
 {
 	llvm::InitializeNativeTarget();
+	LLVMLinkInMCJIT();
 	LLVMContext &llvmCtx = llvm::getGlobalContext();
 	CG_Context::TheModule = new Module("Kai's HLSL Compiler", llvmCtx);
 	std::string ErrStr;
-	CG_Context::TheExecutionEngine = llvm::EngineBuilder(std::unique_ptr<llvm::Module>(CG_Context::TheModule)).setErrorStr(&ErrStr).create();
+
+	std::unique_ptr<llvm::EngineBuilder> eb(new llvm::EngineBuilder(std::unique_ptr<llvm::Module>(CG_Context::TheModule)));
+
+	eb->setErrorStr(&ErrStr);
+	SmallVector<std::string, 4> attrs;
+	llvm::Triple targetTriple;
+	targetTriple.setTriple(sys::getProcessTriple() + "-elf");
+	auto eeTarget = eb->selectTarget(targetTriple, "", "", attrs);
+	CG_Context::TheExecutionEngine = eb->create(eeTarget);
+
 	if (!CG_Context::TheExecutionEngine) {
 		return false;
 	}
@@ -45,7 +59,7 @@ bool InitializeCodeGen()
 	// Set up the executing engine
 	//
 	// the sybmoll searching(e.g. for standard CRT) is disabled
-	CG_Context::TheExecutionEngine->DisableSymbolSearching(true);
+	//CG_Context::TheExecutionEngine->DisableSymbolSearching(true);
 
 	llvm::InitializeNativeTarget(); 
 	InitializeNativeTargetAsmPrinter();
@@ -56,6 +70,8 @@ bool InitializeCodeGen()
 
 void DestoryCodeGen()
 {
+	CG_Context::TheExecutionEngine->removeModule(CG_Context::TheModule);
+
 	delete CG_Context::TheFPM;
 	delete CG_Context::TheExecutionEngine;
 }

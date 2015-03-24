@@ -186,7 +186,7 @@ void* KSC_GetFunctionPtr(FunctionHandle hFunc, bool bDump)
 			printf("------------- Function after FPM optimization ------------------------\n");
 			wrapperF->dump();
 		}
-		void* ret = SC::CG_Context::TheExecutionEngine->getPointerToFunction(wrapperF);
+		void* ret = (void*)SC::CG_Context::TheExecutionEngine->getFunctionAddress(wrapperF->getName());
 		pFuncDesc->pJIT_Func = ret;
 		return ret;
 	}

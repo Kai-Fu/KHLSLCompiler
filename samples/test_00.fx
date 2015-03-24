@@ -30,6 +30,5 @@ void run_test()
 
 	float res0 = TestFunc_0(2, 0.5);
 	float res1 = TestFunc_1(2);
-	//CompareTwoInt(res0*1000, res1*1000);
-	//return 0;
+	CompareTwoInt(res0*1000, res1*1000);
 }
