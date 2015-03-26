@@ -1,8 +1,6 @@
 #include "IR_Gen_Context.h"
 #include <llvm/ADT/Triple.h>
 #include <llvm/Support/Host.h>
-#include <llvm/ExecutionEngine/RTDyldMemoryManager.h>
-#include <llvm/ExecutionEngine/SectionMemoryManager.h>
 
 namespace SC {
 
@@ -10,24 +8,31 @@ llvm::IRBuilder<> CG_Context::sBuilder(getGlobalContext());
 llvm::Module* CG_Context::TheModule = NULL;
 llvm::ExecutionEngine* CG_Context::TheExecutionEngine = NULL;
 llvm::FunctionPassManager* CG_Context::TheFPM = NULL;
-llvm::DataLayout* CG_Context::TheDataLayout = NULL;
-std::hash_map<std::string, void*> CG_Context::sGlobalFuncSymbols;
+const llvm::DataLayout* CG_Context::TheDataLayout = NULL;
+GobalSymbolMemManager* CG_Context::TheSymbolMemMgr = NULL;
 
 bool InitializeCodeGen()
 {
 	llvm::InitializeNativeTarget();
+	InitializeNativeTargetAsmPrinter();
 	LLVMLinkInMCJIT();
 	LLVMContext &llvmCtx = llvm::getGlobalContext();
 	CG_Context::TheModule = new Module("Kai's HLSL Compiler", llvmCtx);
 	std::string ErrStr;
 
 	std::unique_ptr<llvm::EngineBuilder> eb(new llvm::EngineBuilder(std::unique_ptr<llvm::Module>(CG_Context::TheModule)));
-
+	// Make sure to use the customized Memory Manager to external symbol lookup(LLVM 3.60 require this change).
+	CG_Context::TheSymbolMemMgr = new GobalSymbolMemManager;
+	eb->setMCJITMemoryManager(std::unique_ptr<SC::GobalSymbolMemManager>(CG_Context::TheSymbolMemMgr));
 	eb->setErrorStr(&ErrStr);
+
 	SmallVector<std::string, 4> attrs;
 	llvm::Triple targetTriple;
+	// Append "-elf" to make MCJIT to generate ELF data in memory(Windows defaults to COFF)
 	targetTriple.setTriple(sys::getProcessTriple() + "-elf");
 	auto eeTarget = eb->selectTarget(targetTriple, "", "", attrs);
+
+	// Now create the execute engine.
 	CG_Context::TheExecutionEngine = eb->create(eeTarget);
 
 	if (!CG_Context::TheExecutionEngine) {
@@ -38,7 +43,7 @@ bool InitializeCodeGen()
 
 	// Set up the optimizer pipeline.  Start with registering info about how the
 	// target lays out data structures.
-	CG_Context::TheDataLayout = new DataLayout(*CG_Context::TheExecutionEngine->getDataLayout());
+	CG_Context::TheDataLayout = CG_Context::TheExecutionEngine->getDataLayout();
 	//CG_Context::TheFPM->add(CG_Context::TheDataLayout);
 	// Provide basic AliasAnalysis support for GVN.
 	CG_Context::TheFPM->add(createBasicAliasAnalysisPass());
@@ -55,23 +60,13 @@ bool InitializeCodeGen()
 
 	CG_Context::TheFPM->doInitialization();
 
-
-	// Set up the executing engine
-	//
-	// the sybmoll searching(e.g. for standard CRT) is disabled
-	//CG_Context::TheExecutionEngine->DisableSymbolSearching(true);
-
-	llvm::InitializeNativeTarget(); 
-	InitializeNativeTargetAsmPrinter();
-    LLVMLinkInMCJIT(); 
-
 	return true;
 }
 
 void DestoryCodeGen()
 {
 	CG_Context::TheExecutionEngine->removeModule(CG_Context::TheModule);
-
+	delete CG_Context::TheModule;
 	delete CG_Context::TheFPM;
 	delete CG_Context::TheExecutionEngine;
 }

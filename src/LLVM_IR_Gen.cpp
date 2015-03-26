@@ -6,7 +6,6 @@
 #pragma warning(disable: 4267 4800 4244 4291 4996)
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
-//#include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -17,6 +16,7 @@
 #include <llvm/Support/TargetSelect.h>
 
 #pragma warning(pop)
+
 
 using namespace llvm;
 
@@ -158,8 +158,9 @@ llvm::Value* Exp_FunctionDecl::GenerateCode(CG_Context* context) const
 
 	if (!mHasBody) {
 		// Function doens't have the body, so it must be an external function.
-		if (CG_Context::sGlobalFuncSymbols.find(mFuncName) != CG_Context::sGlobalFuncSymbols.end()) {
-			CG_Context::TheExecutionEngine->addGlobalMapping(F, CG_Context::sGlobalFuncSymbols[mFuncName]);
+		auto& symbolLUT = CG_Context::TheSymbolMemMgr->mGlobalFuncSymbols;
+		if (symbolLUT.find(mFuncName) != symbolLUT.end()) {
+			CG_Context::TheExecutionEngine->addGlobalMapping(F, symbolLUT[mFuncName]);
 			return F;
 		}
 		else {

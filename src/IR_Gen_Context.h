@@ -18,6 +18,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/IR/Intrinsics.h>
 #pragma warning(pop)
+#include "global_symbols.h"
 
 using namespace llvm;
 
@@ -51,9 +52,9 @@ public:
 	static llvm::Module *TheModule;
 	static llvm::ExecutionEngine* TheExecutionEngine;
 	static llvm::FunctionPassManager* TheFPM;
-	static llvm::DataLayout* TheDataLayout;
+	static const llvm::DataLayout* TheDataLayout;
 	static llvm::IRBuilder<> sBuilder;
-	static std::hash_map<std::string, void*> sGlobalFuncSymbols;
+	static GobalSymbolMemManager* TheSymbolMemMgr;
 
 public:
 	static llvm::Type* ConvertToLLVMType(VarType tp);

@@ -144,6 +144,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\DLL_Main.cpp" />
+    <ClCompile Include="src\global_symbols.cpp" />
     <ClCompile Include="src\IR_Gen_Context.cpp" />
     <ClCompile Include="src\LLVM_IR_Gen.cpp" />
     <ClCompile Include="src\parser_AST_Gen.cpp" />
@@ -152,6 +153,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\SC_API.h" />
+    <ClInclude Include="src\global_symbols.h" />
     <ClInclude Include="src\IR_Gen_Context.h" />
     <ClInclude Include="src\parser_AST_Gen.h" />
     <ClInclude Include="src\parser_defines.h" />

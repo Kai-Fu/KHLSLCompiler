@@ -124,7 +124,7 @@ const char* KSC_GetLastErrorMsg()
 
 bool KSC_AddExternalFunction(const char* funcName, void* funcPtr)
 {
-	SC::CG_Context::sGlobalFuncSymbols[funcName] = funcPtr;
+	SC::CG_Context::TheSymbolMemMgr->mGlobalFuncSymbols[funcName] = funcPtr;
 	return true;
 }
 
