@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "SC_API.h"
 #include <string.h>
+#include <vector>
 
 void CompareTwoInt(int a, int b)
 {
@@ -14,7 +15,28 @@ void CompareTwoInt(int a, int b)
 
 int main(int argc, char* argv[])
 {
-	KSC_Initialize();
+	std::vector<char> common_code;
+	{
+		// Process the common.fx file
+		FILE* f = NULL;
+		fopen_s(&f, "common.fx", "r");
+		if (f == NULL)
+			return NULL;
+		fseek(f, 0, SEEK_END);
+		long len = ftell(f);
+		fseek(f, 0, SEEK_SET);
+
+		common_code.resize(len + 1);
+		common_code[0] = '\0';
+		size_t readSize = fread(&common_code.front(), 1, len, f);
+		fclose(f);
+		if (readSize > 0) {
+			common_code[readSize] = '\0';
+		}
+	}
+
+	
+	KSC_Initialize(&common_code.front());
 	KSC_AddExternalFunction("CompareTwoInt", CompareTwoInt);
 
 	FILE* f = NULL;

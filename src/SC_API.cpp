@@ -170,12 +170,13 @@ ModuleHandle KSC_CompileFile(const char* srcFileName)
 	long len = ftell(f);
 	fseek(f, 0, SEEK_SET);
 
-	char* content = new char[len + 1];
-	size_t readSize = fread(content, 1, len, f);
+	std::vector<char> content(len + 1);
+	content[0] = '\0';
+	size_t readSize = fread(&content.front(), 1, len, f);
 	fclose(f);
 	if (readSize > 0) {
 		content[readSize] = '\0';
-		return KSC_Compile(content);
+		return KSC_Compile(&content.front());
 	}
 	else
 		return NULL;

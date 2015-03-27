@@ -1,5 +1,5 @@
 // This is comments..
-void CompareTwoInt(int a, int b);
+
 float TestFunc_0(float l, float r) 
 {
 	return pow(l, r);
