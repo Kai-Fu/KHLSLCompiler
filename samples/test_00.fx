@@ -1,7 +1,5 @@
 // This is comments..
-
 void CompareTwoInt(int a, int b);
-
 float TestFunc_0(float l, float r) 
 {
 	return pow(l, r);
@@ -17,7 +15,7 @@ float ExternFunc(MyExtType arg)
 	tmp1[1] = arg;
 	bool tmpB = true;
 	bool tmpA = !tmpB;
-	return 123.45;
+	return 123;
 }
 
 float TestFunc_1(float l) 

@@ -236,7 +236,9 @@ llvm::Value* Exp_FuncRet::GenerateCode(CG_Context* context) const
 	if (mpRetValue) {
 		llvm::Value* retVal = mpRetValue->GenerateCode(context);
 		assert(retVal);
-		return CG_Context::sBuilder.CreateStore(retVal, context->GetRetValuePtr());
+		const SC::Exp_StructDef* structDef;
+		Value* convertedValue = context->CastValueType(retVal, mCachedTypeInfo.type, mpFuncDecl->GetReturnType(structDef));
+		return CG_Context::sBuilder.CreateStore(convertedValue, context->GetRetValuePtr());
 	}
 
 	CG_Context::sBuilder.CreateBr(context->GetFuncRetBlk());

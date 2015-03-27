@@ -464,7 +464,6 @@ RootDomain* CompilingContext::Parse(const char* content, CodeDomain* pRefDomain)
 	mCurParsingPtr = mContentPtr;
 	mCurParsingLOC = 1;
 
-	PushStatusCode(kAlllowStructDef | kAlllowFuncDef);
 	RootDomain* rootDomain = new RootDomain(pRefDomain);
 	while (ParseSingleExpression(rootDomain, NULL));
 
@@ -485,7 +484,6 @@ bool CompilingContext::ParsePartial(const char* content, CodeDomain* pDomain)
 	mCurParsingPtr = mContentPtr;
 	mCurParsingLOC = 1;
 
-	PushStatusCode(kAlllowStructDef | kAlllowFuncDef);
 	while (ParseSingleExpression(pDomain, NULL));
 
 	if (IsEOF() && mErrorMessages.empty()) {
@@ -630,6 +628,8 @@ int DataBlock::GetSize()
 Exp_StructDef::Exp_StructDef(std::string name, CodeDomain* parentDomain) :
 	CodeDomain(parentDomain)
 {
+	// Only allow variable definition in structure declaration
+	mExpAllowedFlag = kAllowVarDef;
 	mStructName = name;
 }
 
@@ -667,10 +667,8 @@ Exp_StructDef* Exp_StructDef::Parse(CompilingContext& context, CodeDomain* curDo
 	bool succeed = false;
 	std::auto_ptr<Exp_StructDef> pStructDef(new Exp_StructDef(structName, curDomain));
 
-	context.PushStatusCode(CompilingContext::kAllowVarDef);
 	if (context.ParseCodeDomain(pStructDef.get(), "}"))
 		succeed = true;
-	context.PopStatusCode();
 
 	curT = context.PeekNextToken(0);
 	if (curT.IsEqual("}"))
@@ -926,7 +924,7 @@ bool Exp_VarDef::Parse(CompilingContext& context, CodeDomain* curDomain, std::ve
 		if (context.PeekNextToken(0).IsEqual("=")) {
 
 			Token firstT = context.PeekNextToken(0);
-			if (context.GetStatusCode() & CompilingContext::kAllowVarInit) {
+			if (curDomain->mExpAllowedFlag & CodeDomain::kAllowVarInit) {
 				context.GetNextToken(); // Eat the "="
 				if (varType == VarType::kStructure) {
 					context.AddErrorMessage(curT, "Initialization for structure variable is not supported.");
@@ -1000,23 +998,7 @@ bool CompilingContext::IsEOF() const
 	return (*mCurParsingPtr == '\0');
 }
 
-void CompilingContext::PushStatusCode(int code)
-{
-	mStatusCode.push_back(code);
-}
 
-int CompilingContext::GetStatusCode()
-{
-	if (mStatusCode.empty())
-		return 0;
-	else
-		return mStatusCode.back();
-}
-
-void CompilingContext::PopStatusCode()
-{
-	mStatusCode.pop_back();
-}
 
 Exp_ValueEval::TypeInfo::TypeInfo()
 {
@@ -1058,7 +1040,7 @@ bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain, const char* 
 	if (endT && PeekNextToken(0).IsEqual(endT)) {
 		return false;
 	}
-	else if ((GetStatusCode() & kAllowForExp) && PeekNextToken(0).IsEqual("for")) {
+	else if ((curDomain->mExpAllowedFlag & CodeDomain::kAllowForExp) && PeekNextToken(0).IsEqual("for")) {
 		Exp_For* pFor = Exp_For::Parse(*this, curDomain);
 		if (!pFor) {
 			return false;
@@ -1073,7 +1055,7 @@ bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain, const char* 
 		}
 		curDomain->AddForExpression(pFor);
 	}
-	else if ((GetStatusCode() & kAllowIfExp) && IsIfExpPartten()) {
+	else if ((curDomain->mExpAllowedFlag & CodeDomain::kAllowIfExp) && IsIfExpPartten()) {
 		Exp_If * pIf = Exp_If::Parse(*this, curDomain);
 		if (!pIf) {
 			return false;
@@ -1088,12 +1070,12 @@ bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain, const char* 
 		}
 		curDomain->AddIfExpression(pIf);
 	}
-	else if ((GetStatusCode() & kAlllowFuncDef) && IsFunctionDefinePartten()) {
+	else if ((curDomain->mExpAllowedFlag & CodeDomain::kAlllowFuncDef) && IsFunctionDefinePartten()) {
 		// Parse the function declaration.
 		if (!Exp_FunctionDecl::Parse(*this, curDomain))
 			return false;
 	}
-	else if ((GetStatusCode() & kAllowVarDef) && IsVarDefinePartten(true)) {
+	else if ((curDomain->mExpAllowedFlag & CodeDomain::kAllowVarDef) && IsVarDefinePartten(true)) {
 		std::vector<Exp_VarDef*>  varDefs;
 		if (Exp_VarDef::Parse(*this, curDomain, varDefs)) {
 			for (int i = 0; i < (int)varDefs.size(); ++i)
@@ -1102,14 +1084,14 @@ bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain, const char* 
 		else
 			return false;
 	}
-	else if ((GetStatusCode() & kAlllowStructDef) && IsStructDefinePartten()) {
+	else if ((curDomain->mExpAllowedFlag & CodeDomain::kAlllowStructDef) && IsStructDefinePartten()) {
 		Exp_StructDef* structDef = Exp_StructDef::Parse(*this, curDomain);
 		if (structDef)
 			curDomain->AddStructDefExpression(structDef);
 		else
 			return false;
 	}
-	else if ((GetStatusCode() & kAlllowStructDef) && IsExternalTypeDefParttern()) {
+	else if ((curDomain->mExpAllowedFlag & CodeDomain::kAlllowStructDef) && IsExternalTypeDefParttern()) {
 		Token curT = GetNextToken();
 		if (!curT.IsEqual("extern")) {
 			AddErrorMessage(curT, "Keyword \"extern\" is expected.");
@@ -1131,7 +1113,7 @@ bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain, const char* 
 		}
 
 	}
-	else if (GetStatusCode() & kAllowValueExp) {
+	else if (curDomain->mExpAllowedFlag & CodeDomain::kAllowValueExp) {
 
 		Exp_ValueEval* pNewExp = NULL;
 		Exp_ValueEval::TypeInfo funcRetTypeInfo;
@@ -1238,6 +1220,7 @@ bool CompilingContext::ParseCodeDomain(CodeDomain* curDomain, const char* endT)
 CodeDomain::CodeDomain(CodeDomain* parent)
 {
 	mpParentDomain = parent;
+	mExpAllowedFlag = parent ? parent->mExpAllowedFlag : 0;
 }
 
 CodeDomain::~CodeDomain()
@@ -1461,7 +1444,11 @@ void Exp_VarDef::MakeIntoArraryPtr()
 RootDomain::RootDomain(CodeDomain* pRefDomain) :
 	CodeDomain(pRefDomain)
 {
-
+	mExpAllowedFlag = 
+		kAllowVarInit |
+		kAllowVarDef |
+		kAlllowStructDef |
+		kAlllowFuncDef;
 }
 
 RootDomain::~RootDomain()
@@ -2133,6 +2120,10 @@ Exp_FunctionDecl::Exp_FunctionDecl(CodeDomain* parent) :
 	mReturnType = VarType::kInvalid;
 	mpRetStruct = NULL;
 	mHasBody = false;
+	mExpAllowedFlag = kAlllowStructDef | kAllowReturnExp | 
+		kAllowValueExp | kAllowVarDef |
+		kAllowVarInit | kAllowIfExp |
+		kAllowForExp;
 }
 
 Exp_FunctionDecl::~Exp_FunctionDecl()
@@ -2312,13 +2303,9 @@ Exp_FunctionDecl* Exp_FunctionDecl::Parse(CompilingContext& context, CodeDomain*
 		// Now parse the function body
 		assert(context.mpCurrentFunc == NULL);
 		context.mpCurrentFunc = pFuncDef;
-		context.PushStatusCode(CompilingContext::kAlllowStructDef | CompilingContext::kAllowReturnExp | 
-			CompilingContext::kAllowValueExp | CompilingContext::kAllowVarDef |
-			CompilingContext::kAllowVarInit | CompilingContext::kAllowIfExp |
-			CompilingContext::kAllowForExp);
 		if (!context.ParseCodeDomain(pFuncDef, NULL))
 			ret = NULL;
-		context.PopStatusCode();
+		
 		context.mpCurrentFunc = NULL;
 		if (!ret)
 			return NULL; // Bad function body

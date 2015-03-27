@@ -160,6 +160,27 @@ ModuleHandle KSC_Compile(const char* sourceCode)
 	return ret;
 }
 
+ModuleHandle KSC_CompileFile(const char* srcFileName)
+{
+	FILE* f = NULL;
+	fopen_s(&f, srcFileName, "r");
+	if (f == NULL)
+		return NULL;
+	fseek(f, 0, SEEK_END);
+	long len = ftell(f);
+	fseek(f, 0, SEEK_SET);
+
+	char* content = new char[len + 1];
+	size_t readSize = fread(content, 1, len, f);
+	fclose(f);
+	if (readSize > 0) {
+		content[readSize] = '\0';
+		return KSC_Compile(content);
+	}
+	else
+		return NULL;
+}
+
 void* KSC_GetFunctionPtr(FunctionHandle hFunc, bool bDump)
 {
 	KSC_FunctionDesc* pFuncDesc = (KSC_FunctionDesc*)hFunc;

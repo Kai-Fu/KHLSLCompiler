@@ -25,46 +25,21 @@ int main(int argc, char* argv[])
 	while (1) {
 		char fileNameBuf[200];
 		sprintf_s(fileNameBuf, "%s%.2d%s", fileNameBase, test_cast_idx, fileNameExt);
-		fopen_s(&f, fileNameBuf, "r");
-		if (f == NULL)
-			break;
-		fseek(f, 0, SEEK_END);
-		long len = ftell(f);
-		fseek(f, 0, SEEK_SET);
-
-		char* content = new char[len + 1];
-		char* line = content;
-		size_t totalLen = 0;
-
-		while (fgets(line, len, f) != NULL) {
-			size_t lineLen = strlen(line);
-			line += lineLen;
-			totalLen += lineLen;
+		
+		ModuleHandle hModule = KSC_CompileFile(fileNameBuf);
+		if (!hModule) {
+			printf(KSC_GetLastErrorMsg());
+			return -1;
 		}
 
-		if (totalLen == 0) {
-			fclose(f);
-			break;
-		}
-		else {
-			content[totalLen] = '\0';
-
-			ModuleHandle hModule = KSC_Compile(content);
-			if (!hModule) {
-				printf(KSC_GetLastErrorMsg());
-				return -1;
-			}
-
-			typedef void (*PFN_run_test)();
-			FunctionHandle hFunc = KSC_GetFunctionHandleByName("run_test", hModule);
-			PFN_run_test run_test = (PFN_run_test)KSC_GetFunctionPtr(hFunc, true);
+		typedef void (*PFN_run_test)();
+		FunctionHandle hFunc = KSC_GetFunctionHandleByName("run_test", hModule);
+		PFN_run_test run_test = (PFN_run_test)KSC_GetFunctionPtr(hFunc, true);
 			
-			printf("Test %.2d:", test_cast_idx);
-			run_test();
-			printf("\n");
-			++test_cast_idx;
-		}
-		fclose(f);
+		printf("Test %.2d:", test_cast_idx);
+		run_test();
+		printf("\n");
+		++test_cast_idx;
 	}
 
 	KSC_Destory();

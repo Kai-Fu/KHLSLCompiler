@@ -136,8 +136,19 @@ namespace SC {
 		std::hash_map<std::string, Exp_VarDef*> mDefinedVariables;
 		std::hash_map<std::string, Exp_FunctionDecl*> mDefinedFunctions;
 		std::hash_set<std::string> mExternalTypes;
-
+	public:
 		std::vector<Expression*> mExpressions;
+		enum ParsingStatus {
+			kAllowValueExp		= 0x00000001,
+			kAllowVarInit		= 0x00000002,
+			kAllowVarDef		= 0x00000004,
+			kAllowReturnExp		= 0x00000008,
+			kAlllowStructDef	= 0x00000010,
+			kAlllowFuncDef		= 0x00000020,
+			kAllowIfExp			= 0x00000040,
+			kAllowForExp		= 0x00000080
+		};
+		int mExpAllowedFlag;
 
 	private:
 		void AddDefinedType(Exp_StructDef* pStructDef);
@@ -524,17 +535,7 @@ namespace SC {
 
 	class CompilingContext
 	{
-	public:
-		enum ParsingStatus {
-			kAllowValueExp		= 0x00000001,
-			kAllowVarInit		= 0x00000002,
-			kAllowVarDef		= 0x00000004,
-			kAllowReturnExp		= 0x00000008,
-			kAlllowStructDef	= 0x00000010,
-			kAlllowFuncDef		= 0x00000020,
-			kAllowIfExp			= 0x00000040,
-			kAllowForExp		= 0x00000080
-		};
+
 	private:
 		const char* mContentPtr;
 		const char* mCurParsingPtr;
@@ -545,7 +546,6 @@ namespace SC {
 		std::list<std::pair<Token, std::string> > mErrorMessages;
 		std::list<std::pair<Token, std::string> > mWarningMessages;
 		std::list<std::string> mConstStrings;
-		std::list<int> mStatusCode;
 	public:
 		Exp_FunctionDecl* mpCurrentFunc;
 
@@ -576,10 +576,6 @@ namespace SC {
 
 		RootDomain* Parse(const char* content, CodeDomain* pRefDomain);
 		bool ParsePartial(const char* content, CodeDomain* pDomain);
-
-		void PushStatusCode(int code);
-		int GetStatusCode();
-		void PopStatusCode();
 
 		bool ParseSingleExpression(CodeDomain* curDomain, const char* endT);
 

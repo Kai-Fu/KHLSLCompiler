@@ -108,6 +108,16 @@ struct KSC_TypeInfo
 extern "C" {
 
 	/**
+		There're cases that the client application wants its KSC code to be able to invoke a function that is
+		implemented in hosting C++ code. Use this function to tell KSC the function pointer and its function name
+		that will link with KSCL.
+		In KSCL side, you still need to declare the function without body implementation in order to let KSC know
+		it should look up in the external symbol for the implementation of this function.
+		NOTE: this function must be invoked before KSC_Initialize() is invoked.
+	*/
+	KSC_API bool KSC_AddExternalFunction(const char* funcName, void* funcPtr);
+
+	/**
 		The initialization function of KSC. It should be called before any other APIs get called.
 		The argument "sharedCode" is the code that will be shared between multiple modules, e.g. some global
 		functions or structure definitions. If the shared code contains bad syntax this function will fail.
@@ -129,18 +139,10 @@ extern "C" {
 	KSC_API const char* KSC_GetLastErrorMsg();
 
 	/**
-		There're cases that the client application wants its KSC code to be able to invoke a function that is
-		implemented in hosting C++ code. Use this function to tell KSC the function pointer and its function name
-		that will link with KSCL.
-		In KSCL side, you still need to declare the function without body implementation in order to let KSC know
-		it should look up in the external symbol for the implementation of this function.
-	*/
-	KSC_API bool KSC_AddExternalFunction(const char* funcName, void* funcPtr);
-
-	/**
 		This function compiles the KSCL code, it will return the module handle on succeed otherwise return NULL.
 	*/
 	KSC_API ModuleHandle KSC_Compile(const char* sourceCode);
+	KSC_API ModuleHandle KSC_CompileFile(const char* srcFileName);
 
 	/**
 		This funtion is to JIT the function with the function handle specified.
