@@ -876,6 +876,7 @@ bool Exp_VarDef::Parse(CompilingContext& context, CodeDomain* curDomain, std::ve
 	bool bContinue = false;;
 	do {
 		curT = context.GetNextToken();
+		Token varName = curT;
 		if (curT.GetType() != Token::kIdentifier) {
 			context.AddErrorMessage(curT, "Invalid token, must be a valid identifier.");
 			return false;
@@ -903,7 +904,14 @@ bool Exp_VarDef::Parse(CompilingContext& context, CodeDomain* curDomain, std::ve
 		int arrayCnt = 0;
 		if (context.PeekNextToken(0).IsEqual("[")) {
 			context.GetNextToken(); // Eat the "["
-			Exp_ValueEval* pOrgValue = context.ParseComplexExpression(curDomain, "]");
+			Exp_ValueEval* pOrgValue = context.ParseComplexExpression(curDomain); // Should end of "]"
+			if (pOrgValue) {
+				curT = context.GetNextToken();
+				if (!curT.IsEqual("]")) {
+					context.AddErrorMessage(curT, "Expect a \"]\".");
+					return false;
+				}
+			}
 			Exp_Constant* arrayCntExp = dynamic_cast<Exp_Constant*>(pOrgValue);
 
 			if (!arrayCntExp || arrayCntExp->IsFloat()) {
@@ -914,7 +922,6 @@ bool Exp_VarDef::Parse(CompilingContext& context, CodeDomain* curDomain, std::ve
 			
 			arrayCnt = (int)arrayCntExp->GetValue();
 			delete pOrgValue;
-			context.GetNextToken(); // Eat the "]"
 
 		}
 
@@ -931,9 +938,10 @@ bool Exp_VarDef::Parse(CompilingContext& context, CodeDomain* curDomain, std::ve
 					return false;
 				}
 				// Handle the variable initialization
-				pInitValue = context.ParseComplexExpression(curDomain, ";");
+				pInitValue = context.ParseComplexExpression(curDomain); // Should end with ";" or ","
 				if (!pInitValue)
 					return false;
+
 				Exp_ValueEval::TypeInfo typeInfo;
 				std::string errMsg;
 				std::vector<std::string> warnMsg;
@@ -956,7 +964,7 @@ bool Exp_VarDef::Parse(CompilingContext& context, CodeDomain* curDomain, std::ve
 			}
 		}
 
-		Exp_VarDef* ret = new Exp_VarDef(varType, curT, pInitValue);
+		Exp_VarDef* ret = new Exp_VarDef(varType, varName, pInitValue);
 		ret->mTypeString = typeString;
 		ret->mArrayCnt = arrayCnt;
 
@@ -1124,27 +1132,33 @@ bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain, const char* 
 			assert(pFuncDecl); // return expression should be only allowed in function body.
 			Exp_ValueEval* pValue = NULL;
 			if (!PeekNextToken(0).IsEqual(";")) {
-				pValue = ParseComplexExpression(curDomain, ";");
+				pValue = ParseComplexExpression(curDomain); // Should end with ";"
 				if (!pValue) return false;
+
+				Token curT = GetNextToken();
+				if (!curT.IsEqual(";")) {
+					AddErrorMessage(curT, "Expect a \";\".");
+					return false;
+				}
 			}
-			if (!PeekNextToken(0).IsEqual(";")) {
-				AddErrorMessage(PeekNextToken(0), "Unexpected token.");
-				return false;
-			}
-			GetNextToken(); // Eat the ";"
 
 			pNewExp = new Exp_FuncRet(pFuncDecl, pValue);
 			funcRetTypeInfo.type = pFuncDecl->GetReturnType(funcRetTypeInfo.pStructDef);
 		}
 		else {
 			// Try to parse a complex expression
-			pNewExp = ParseComplexExpression(curDomain, ";");
+			pNewExp = ParseComplexExpression(curDomain);  // Should end with ";"
 			if (!pNewExp) {
 				Token curT = PeekNextToken(0);
 				AddErrorMessage(curT, "Unexpected end of file");
 				return false;
 			}
-			GetNextToken(); // Eat the ";"
+
+			Token curT = GetNextToken();
+			if (!curT.IsEqual(";")) {
+				AddErrorMessage(curT, "Expect a \";\".");
+				return false;
+			}
 		}
 
 		if (pNewExp) {
@@ -1530,11 +1544,16 @@ Exp_ValueEval* CompilingContext::ParseSimpleExpression(CodeDomain* curDomain)
 			bool succeed = false;
 			Token lastT;
 			for (int i = 0; i < tpDesc.elemCnt; ++i) {
-				exp[i].reset(ParseComplexExpression(curDomain, ")", ","));
+				exp[i].reset(ParseComplexExpression(curDomain));
 				if (!exp[i].get()) return NULL;
 				// Eat the end token ")" or ","
-				if (GetNextToken().IsEqual(")")) 
+				curT = GetNextToken();
+				if (curT.IsEqual(")"))
 					break;
+				if (!curT.IsEqual(",")) {
+					AddErrorMessage(curT, "Expect a \",\".");
+					return NULL;
+				}
 			}
 
 			Exp_ValueEval* expArray[4] = {exp[0].get(), exp[1].get(), exp[2].get(), exp[3].get()};
@@ -1562,12 +1581,16 @@ Exp_ValueEval* CompilingContext::ParseSimpleExpression(CodeDomain* curDomain)
 			int argCnt = pFuncDecl->GetArgumentCnt();
 			std::vector<std::auto_ptr<Exp_ValueEval> > argExp(argCnt);
 			for (int i = 0; i < argCnt; ++i) {
-				argExp[i].reset(ParseComplexExpression(curDomain, (i == (argCnt-1)) ? ")" : ","));
+				argExp[i].reset(ParseComplexExpression(curDomain));
 				if (!argExp[i].get()) {
-					AddErrorMessage(PeekNextToken(0), "Invalid function call.");
+					AddErrorMessage(curT, "Invalid function call.");
 					return NULL;
 				}
-				GetNextToken(); // Eat the ")" or ","
+				curT = GetNextToken(); // Eat the ")" or ","
+				if (!curT.IsEqual(i == (argCnt - 1) ? ")" : ",")) {
+					AddErrorMessage(curT, "\"(\" or \",\" is expected.");
+					return NULL;
+				}
 			}
 			std::vector<Exp_ValueEval*> argExpArray(argCnt);
 			for (int i = 0; i < argCnt; ++i) {
@@ -1589,10 +1612,14 @@ Exp_ValueEval* CompilingContext::ParseSimpleExpression(CodeDomain* curDomain)
 	}
 	else if (curT.GetType() == Token::kOpenParenthesis) {
 		// This expression starts with "(", so it needs to end up with ")".
-		Exp_ValueEval* ret = ParseComplexExpression(curDomain, ")");
+		Exp_ValueEval* ret = ParseComplexExpression(curDomain); // Should end with ")"
 		if (ret) {
 			result.reset(ret);
-			GetNextToken(); // Eat the ")"
+			curT = GetNextToken();
+			if (!curT.IsEqual(")")) {
+				AddErrorMessage(curT, "Expect a \")\".");
+				return NULL;
+			}
 		}
 	}
 	else {
@@ -1609,7 +1636,7 @@ Exp_ValueEval* CompilingContext::ParseSimpleExpression(CodeDomain* curDomain)
 		AddErrorMessage(curT, "Unexpected token.");
 		return NULL;
 	}
-	// This is not the end of simple expression, I need to check for the next token to see if it has swizzle or structure member access.
+	// This is not the end of simple expression, I need to check for the next token to see if it has swizzle/structure member access or index operation.
 	// e.g. myVar.xyz, myVar.myVar
 	while (PeekNextToken(0).IsEqual(".") || PeekNextToken(0).IsEqual("[")) {
 		// Need to deal with dot operator
@@ -1623,12 +1650,16 @@ Exp_ValueEval* CompilingContext::ParseSimpleExpression(CodeDomain* curDomain)
 			result.reset(new Exp_DotOp(curT.ToStdString(), result.release()));
 		}
 		else {
-			Exp_ValueEval* idx = ParseComplexExpression(curDomain, "]");
+			Exp_ValueEval* idx = ParseComplexExpression(curDomain);
 			if (idx == NULL) {
 				AddErrorMessage(curT, "Invalid indexing expression.");
 				return NULL;
 			}
-			GetNextToken(); // Eat the ending "]"
+			if (!GetNextToken().IsEqual("]")) {
+				// Eat the ending "]"
+				AddErrorMessage(curT, "Expecting a \"]\".");
+				return NULL;
+			}
 			result.reset(new Exp_Indexer(result.release(), idx));
 		}
 
@@ -1713,6 +1744,88 @@ Exp_ValueEval* CompilingContext::ParseComplexExpression(CodeDomain* curDomain, c
 				Exp_BinaryOp* pBinaryOp = new Exp_BinaryOp(op0_str, simpleExp0.release(), selectValue.release());
 				ret = pBinaryOp;
 			}
+		}
+	}
+
+	return ret;
+}
+
+Exp_ValueEval * CompilingContext::ParseComplexExpression(CodeDomain * curDomain, Exp_ValueEval * pLeftValueExp)
+{
+	Token curT = PeekNextToken(0);
+
+	std::auto_ptr<Exp_ValueEval> simpleLeftExp;
+	if (pLeftValueExp)
+		simpleLeftExp.reset(pLeftValueExp);
+	else {
+		simpleLeftExp.reset(ParseSimpleExpression(curDomain));
+	}
+
+	if (!simpleLeftExp.get()) {
+		// Must have some error message if it failed to parse a simple expression
+		assert(!mErrorMessages.empty());
+		return NULL;
+	}
+
+	Exp_ValueEval* ret = NULL;
+	curT = PeekNextToken(0);
+	/*curT = pValueExp0 ? tOp0 : PeekNextToken(0);
+	if (curT.IsEqual(pEndToken0) || curT.IsEqual(pEndToken1)) {
+		ret = simpleExp0.release();
+	}
+	else*/ {
+		if (curT.GetType() != Token::kBinaryOp) {
+			// Ending the parse for complex expression since a non-binary operator is met.
+			return simpleLeftExp.release();
+		}
+
+		GetNextToken(); // East the binary operator
+		int op0_level = curT.GetBinaryOpLevel();
+		std::string op0_str = curT.ToStdString();
+
+		std::auto_ptr<Exp_ValueEval> simpleRightExp(ParseSimpleExpression(curDomain));
+		if (!simpleRightExp.get()) {
+			// Must have some error message if it failed to parse a simple expression
+			assert(!mErrorMessages.empty());
+			return NULL;
+		}
+
+		Token nextT = PeekNextToken(0);
+		if (nextT.GetType() != Token::kBinaryOp) {
+			// we are done for this complex value expression, return it.
+			Exp_BinaryOp* pBinaryOp = new Exp_BinaryOp(op0_str, simpleLeftExp.release(), simpleRightExp.release());
+			ret = pBinaryOp;
+		}
+		else {
+			// Check if next binary operator is in higher level of priority
+			GetNextToken(); // Eat the binary operator
+			int op1_level = nextT.GetBinaryOpLevel();
+			std::string op1_str = nextT.ToStdString();
+
+			if (op1_str == "?") {
+				std::auto_ptr<Exp_ValueEval> selectValue(Exp_Select::Parse(*this, curDomain, simpleRightExp.release()));
+				if (!selectValue.get()) {
+					assert(!mErrorMessages.empty());
+					return NULL;
+				}
+				Exp_BinaryOp* pBinaryOp = new Exp_BinaryOp(op0_str, simpleLeftExp.release(), selectValue.release());
+				ret = pBinaryOp;
+			}
+			else {
+				if (op1_level > op0_level) {
+					Exp_ValueEval* tempRightExp = ParseComplexExpression(curDomain, simpleRightExp.release());
+					if (tempRightExp) {
+						Exp_BinaryOp* pBinaryOp = new Exp_BinaryOp(op0_str, simpleLeftExp.release(), tempRightExp);
+						ret = pBinaryOp;
+					}
+				}
+				else {
+					Exp_BinaryOp* pBinaryOpLeft = new Exp_BinaryOp(op0_str, simpleLeftExp.release(), simpleRightExp.release());
+					Exp_ValueEval* simpleExpRet = ParseComplexExpression(curDomain, pBinaryOpLeft);
+					ret = simpleExpRet;
+				}
+			}
+			
 		}
 	}
 
