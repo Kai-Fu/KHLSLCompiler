@@ -465,7 +465,7 @@ RootDomain* CompilingContext::Parse(const char* content, CodeDomain* pRefDomain)
 	mCurParsingLOC = 1;
 
 	RootDomain* rootDomain = new RootDomain(pRefDomain);
-	while (ParseSingleExpression(rootDomain, NULL));
+	while (ParseSingleExpression(rootDomain));
 
 	if (IsEOF() && mErrorMessages.empty()) {
 		return rootDomain;
@@ -484,7 +484,7 @@ bool CompilingContext::ParsePartial(const char* content, CodeDomain* pDomain)
 	mCurParsingPtr = mContentPtr;
 	mCurParsingLOC = 1;
 
-	while (ParseSingleExpression(pDomain, NULL));
+	while (ParseSingleExpression(pDomain));
 
 	if (IsEOF() && mErrorMessages.empty()) {
 		return true;
@@ -667,7 +667,7 @@ Exp_StructDef* Exp_StructDef::Parse(CompilingContext& context, CodeDomain* curDo
 	bool succeed = false;
 	std::auto_ptr<Exp_StructDef> pStructDef(new Exp_StructDef(structName, curDomain));
 
-	if (context.ParseCodeDomain(pStructDef.get(), "}"))
+	if (context.ParseCodeDomain(pStructDef.get()))
 		succeed = true;
 
 	curT = context.PeekNextToken(0);
@@ -1038,17 +1038,14 @@ bool Exp_ValueEval::TypeInfo::IsSameType(const TypeInfo& ref) const
 		return true;
 }
 
-bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain, const char* endT)
+bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain)
 {
 	if (PeekNextToken(0).IsEOF())
 		return false;
 	
 	Token firstT = PeekNextToken(0);
 
-	if (endT && PeekNextToken(0).IsEqual(endT)) {
-		return false;
-	}
-	else if ((curDomain->mExpAllowedFlag & CodeDomain::kAllowForExp) && PeekNextToken(0).IsEqual("for")) {
+	if ((curDomain->mExpAllowedFlag & CodeDomain::kAllowForExp) && PeekNextToken(0).IsEqual("for")) {
 		Exp_For* pFor = Exp_For::Parse(*this, curDomain);
 		if (!pFor) {
 			return false;
@@ -1149,8 +1146,6 @@ bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain, const char* 
 			// Try to parse a complex expression
 			pNewExp = ParseComplexExpression(curDomain);  // Should end with ";"
 			if (!pNewExp) {
-				Token curT = PeekNextToken(0);
-				AddErrorMessage(curT, "Unexpected end of file");
 				return false;
 			}
 
@@ -1199,7 +1194,7 @@ bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain, const char* 
 	return true;
 }
 
-bool CompilingContext::ParseCodeDomain(CodeDomain* curDomain, const char* endT)
+bool CompilingContext::ParseCodeDomain(CodeDomain* curDomain)
 {
 	if (IsEOF())
 		return false;
@@ -1211,19 +1206,15 @@ bool CompilingContext::ParseCodeDomain(CodeDomain* curDomain, const char* endT)
 
 		CodeDomain* childDomain = new CodeDomain(curDomain);
 		curDomain->AddDomainExpression(childDomain);
-		if (!ParseCodeDomain(childDomain, "}"))
+		if (!ParseCodeDomain(childDomain))
 			return false;
 
-		Token endT = PeekNextToken(0);
-		if (endT.IsEqual("}"))
-			GetNextToken(); // eat the "}"
-		else {
-			AddErrorMessage(endT, "\"}\" is expected.");
+		if (!ExpectAndEat("}"))
 			return false;
-		}
+
 	}
 	else {
-		while (ParseSingleExpression(curDomain, endT));
+		while (ParseSingleExpression(curDomain));
 		if (!mErrorMessages.empty())
 			return false;
 	}
@@ -1518,7 +1509,7 @@ bool CompilingContext::ExpectTypeAndEat(CodeDomain* curDomain, VarType& outType,
 
 Exp_ValueEval* CompilingContext::ParseSimpleExpression(CodeDomain* curDomain)
 {
-	Token curT = GetNextToken();
+	Token curT = PeekNextToken(0);
 
 	if (!curT.IsEqual("-") &&
 		curT.GetType() != Token::kIdentifier && 
@@ -1526,9 +1517,11 @@ Exp_ValueEval* CompilingContext::ParseSimpleExpression(CodeDomain* curDomain)
 		curT.GetType() != Token::kConstFloat &&
 		curT.GetType() != Token::kConstInt &&
 		curT.GetType() != Token::kOpenParenthesis) {
-		AddErrorMessage(curT, "Invalid token for value expression.");
+		// Not a valid expression, it could be end of a function body instead of the syntax error.
 		return NULL;
 	}
+	GetNextToken();
+
 
 	std::auto_ptr<Exp_ValueEval> result;
 
@@ -1669,87 +1662,6 @@ Exp_ValueEval* CompilingContext::ParseSimpleExpression(CodeDomain* curDomain)
 	return result.release();
 }
 
-Exp_ValueEval* CompilingContext::ParseComplexExpression(CodeDomain* curDomain, const char* pEndToken0, const char* pEndToken1, Exp_ValueEval* pValueExp0, Token tOp0)
-{
-	Token curT = PeekNextToken(0);
-	if (curT.IsEqual(pEndToken0) || curT.IsEqual(pEndToken1))
-		return NULL;
-	
-	std::auto_ptr<Exp_ValueEval> simpleExp0;
-	if (pValueExp0) 
-		simpleExp0.reset(pValueExp0);
-	else 
-		simpleExp0.reset(ParseSimpleExpression(curDomain));
-
-	if (!simpleExp0.get()) {
-		// Must have some error message if it failed to parse a simple expression
-		assert(!mErrorMessages.empty()); 
-		return NULL;
-	}
-
-	Exp_ValueEval* ret = NULL;
-	curT = pValueExp0 ? tOp0 : PeekNextToken(0);
-	if (curT.IsEqual(pEndToken0) || curT.IsEqual(pEndToken1)) {
-		ret = simpleExp0.release();
-	}
-	else {
-		if (curT.GetType() != Token::kBinaryOp) {
-			AddErrorMessage(curT, "Expect a binary operator.");
-			return NULL;
-		}
-
-		if (pValueExp0 == NULL)
-			GetNextToken(); // Eat the binary operator
-
-		int op0_level = curT.GetBinaryOpLevel();
-		std::string op0_str = curT.ToStdString();
-		tOp0 = curT;
-
-		std::auto_ptr<Exp_ValueEval> simpleExp1(ParseSimpleExpression(curDomain));
-		if (!simpleExp1.get()) {
-			// Must have some error message if it failed to parse a simple expression
-			assert(!mErrorMessages.empty()); 
-			return NULL;
-		}
-
-		Token nextT = PeekNextToken(0);
-		// Get the next token to decide if the next binary operator is in high level of priority
-		if (nextT.IsEqual(pEndToken0) || nextT.IsEqual(pEndToken1)) {
-			// we are done for this complex value expression, return it.
-			Exp_BinaryOp* pBinaryOp = new Exp_BinaryOp(op0_str, simpleExp0.release(), simpleExp1.release());
-			ret = pBinaryOp;
-		}
-		else if (nextT.GetType() == Token::kBinaryOp) {
-
-			GetNextToken(); // Eat the binary operator
-			int op1_level = nextT.GetBinaryOpLevel();
-			std::string op1_str = nextT.ToStdString();
-
-			if (op1_str != "?") {
-				if (op1_level > op0_level) {
-					Exp_ValueEval* simpleExpRight = ParseComplexExpression(curDomain, pEndToken0, pEndToken1, simpleExp1.release(), nextT);
-					if (simpleExpRight) {
-						Exp_BinaryOp* pBinaryOp = new Exp_BinaryOp(op0_str, simpleExp0.release(), simpleExpRight);
-						ret = pBinaryOp;
-					}
-				}
-				else {
-					Exp_BinaryOp* pBinaryOpLeft = new Exp_BinaryOp(op0_str, simpleExp0.release(), simpleExp1.release());
-					Exp_ValueEval* simpleExpRet = ParseComplexExpression(curDomain, pEndToken0, pEndToken1, pBinaryOpLeft, nextT);
-					ret = simpleExpRet;
-				}
-			}
-			else {
-				std::auto_ptr<Exp_ValueEval> selectValue(Exp_Select::Parse(*this, curDomain, simpleExp1.release()));
-				Exp_BinaryOp* pBinaryOp = new Exp_BinaryOp(op0_str, simpleExp0.release(), selectValue.release());
-				ret = pBinaryOp;
-			}
-		}
-	}
-
-	return ret;
-}
-
 Exp_ValueEval * CompilingContext::ParseComplexExpression(CodeDomain * curDomain, Exp_ValueEval * pLeftValueExp)
 {
 	Token curT = PeekNextToken(0);
@@ -1762,8 +1674,6 @@ Exp_ValueEval * CompilingContext::ParseComplexExpression(CodeDomain * curDomain,
 	}
 
 	if (!simpleLeftExp.get()) {
-		// Must have some error message if it failed to parse a simple expression
-		assert(!mErrorMessages.empty());
 		return NULL;
 	}
 
@@ -2416,9 +2326,10 @@ Exp_FunctionDecl* Exp_FunctionDecl::Parse(CompilingContext& context, CodeDomain*
 		// Now parse the function body
 		assert(context.mpCurrentFunc == NULL);
 		context.mpCurrentFunc = pFuncDef;
-		if (!context.ParseCodeDomain(pFuncDef, NULL))
+		if (!context.ParseCodeDomain(pFuncDef))
 			ret = NULL;
-		
+	
+
 		context.mpCurrentFunc = NULL;
 		if (!ret)
 			return NULL; // Bad function body
@@ -2727,13 +2638,18 @@ Exp_If* Exp_If::Parse(CompilingContext& context, CodeDomain* curDomain)
 	// Parse the condition expression
 	//
 	std::auto_ptr<Exp_If> result(new Exp_If(curDomain));
-	result->mpCondValue = context.ParseComplexExpression(curDomain, ")");
+	result->mpCondValue = context.ParseComplexExpression(curDomain); // Should if with ")"
 	if (!result->mpCondValue) {
 		// Bad condition expression
 		return NULL;
 	}
 
-	context.GetNextToken(); // Eat the ending ")" of condition expression
+	curT = context.GetNextToken();
+	if (!curT.IsEqual(")")) {
+		// Eat the ending ")" of condition expression
+		context.AddErrorMessage(curT, "\")\" is expected.");
+		return NULL;
+	}
 
 	// Parse the if code block
 	//
@@ -2741,16 +2657,18 @@ Exp_If* Exp_If::Parse(CompilingContext& context, CodeDomain* curDomain)
 	result->mpIfDomain = new CodeDomain(curDomain);
 	if (curT.IsEqual("{")) {
 		context.GetNextToken();  // Eat the "{"
-		if (!context.ParseCodeDomain(result->mpIfDomain, "}")) {
+		if (!context.ParseCodeDomain(result->mpIfDomain)) {
 			return NULL;
 		}
 		context.GetNextToken();  // Eat the "}"
 	}
 	else {
-		if (!context.ParseSingleExpression(result->mpIfDomain, ";")) {
+		if (!context.ParseSingleExpression(result->mpIfDomain)) {
 			context.AddErrorMessage(curT, "Invalid if expression.");
 			return NULL;
 		}
+		if (!context.ExpectAndEat(";"))
+			return NULL;
 	}
 
 	// Optionally parse the else code block
@@ -2762,16 +2680,20 @@ Exp_If* Exp_If::Parse(CompilingContext& context, CodeDomain* curDomain)
 		curT = context.PeekNextToken(0);
 		if (curT.IsEqual("{")) {
 			context.GetNextToken();  // Eat the "{"
-			if (!context.ParseCodeDomain(result->mpElseDomain, "}")) {
+			if (!context.ParseCodeDomain(result->mpElseDomain)) {
 				return NULL;
 			}
-			context.GetNextToken();  // Eat the "}"
+			if (!context.ExpectAndEat("}"))
+				return NULL;
 		}
 		else {
-			if (!context.ParseSingleExpression(result->mpElseDomain, ";")) {
+			if (!context.ParseSingleExpression(result->mpElseDomain)) {
 				context.AddErrorMessage(curT, "Invalid else expression.");
 				return NULL;
 			}
+
+			if (!context.ExpectAndEat(";"))
+				return NULL;
 		}
 	}
 	return result.release();
@@ -2814,36 +2736,58 @@ Exp_For* Exp_For::Parse(CompilingContext& context, CodeDomain* curDomain)
 	result->mStartStepCond = new CodeDomain(curDomain);
 
 	// Parse start expression
-	if (!context.ParseSingleExpression(result->mStartStepCond, ";")) {
+	if (!context.ParseSingleExpression(result->mStartStepCond)) {
 		if (context.HasErrorMessage())
 			return NULL;
 		result->mStartStepCond->AddValueExpression(new Exp_Nop());
 	}
 	assert(result->mStartStepCond->GetExpressionCnt() == 1);
 	
+	// fist semicolon
 	if (context.PeekNextToken(0).IsEqual(";"))
 		context.GetNextToken(); // Eat the ending ";"
+	else {
+		context.AddErrorMessage(context.GetNextToken(), "Expect \";\".");
+		return NULL;
+	}
+
 	// Parse continuing condition expression
-	Exp_ValueEval* condValue = context.ParseComplexExpression(result->mStartStepCond, ";");
+	Exp_ValueEval* condValue = context.ParseComplexExpression(result->mStartStepCond);
 	if (condValue == NULL) {
 		context.AddErrorMessage(curT, "Invalid for condition expression.");
 		return NULL;
 	}
 
-	context.GetNextToken(); // Eat the ending ";"
+	// second semicolon
+	if (context.PeekNextToken(0).IsEqual(";"))
+		context.GetNextToken(); // Eat the ending ";"
+	else {
+		context.AddErrorMessage(context.GetNextToken(), "Expect \";\".");
+		return NULL;
+	}
+
 	result->mStartStepCond->AddValueExpression(condValue);
 	assert(result->mStartStepCond->GetExpressionCnt() == 2);
 
 	curT = context.PeekNextToken(0);
+
 	// Parse step expression
-	Exp_ValueEval* stepValue = context.ParseComplexExpression(result->mStartStepCond, ")");
+	Exp_ValueEval* stepValue = context.ParseComplexExpression(result->mStartStepCond);
 	if (stepValue == NULL) {
 		if (context.HasErrorMessage()) {
 			context.AddErrorMessage(curT, "Invalid for step expression.");
 			return NULL;
 		}
 	}
-	context.GetNextToken(); // Eat the ending ")"
+	
+	// last bracket
+	if (context.PeekNextToken(0).IsEqual(")"))
+		context.GetNextToken(); // Eat the ending ";"
+	else {
+		context.AddErrorMessage(context.GetNextToken(), "Expect \")\".");
+		return NULL;
+	}
+
 	if (stepValue) 
 		result->mStartStepCond->AddValueExpression(stepValue);
 	else
@@ -2855,17 +2799,21 @@ Exp_For* Exp_For::Parse(CompilingContext& context, CodeDomain* curDomain)
 	result->mForBody = new CodeDomain(result->mStartStepCond);
 	if (curT.IsEqual("{")) {
 		context.GetNextToken();  // Eat the "{"
-		if (!context.ParseCodeDomain(result->mForBody, "}")) {
+		if (!context.ParseCodeDomain(result->mForBody)) {
 			return NULL;
 		}
-		context.GetNextToken();  // Eat the "}"
+		if (!context.ExpectAndEat("}"))
+			return NULL;
 	}
 	else {
-		if (!context.ParseSingleExpression(result->mForBody, ";")) {
+		if (!context.ParseSingleExpression(result->mForBody)) {
 			context.GetNextToken(); // Eat the ";"
 			context.AddErrorMessage(curT, "Invalid for body expression.");
 			return NULL;
 		}
+
+		if (!context.ExpectAndEat(";"))
+			return NULL;
 	}
 
 	return result.release();
@@ -2958,15 +2906,16 @@ Exp_Select* Exp_Select::Parse(CompilingContext& context, CodeDomain* curDomain, 
 	}
 
 	Token curT = context.PeekNextToken(0);
-	std::auto_ptr<Exp_ValueEval> pTrueValue(context.ParseComplexExpression(curDomain, ":"));
+	std::auto_ptr<Exp_ValueEval> pTrueValue(context.ParseComplexExpression(curDomain));
 	if (!pTrueValue.get()) {
 		context.AddErrorMessage(curT, "Invalid true expression for select.");
 		return NULL;
 	}
-	if (context.PeekNextToken(0).IsEqual(":"))
-		context.GetNextToken();
+	
+	if (!context.ExpectAndEat(":"))
+		return NULL;
 
-	std::auto_ptr<Exp_ValueEval> pFalseValue(context.ParseComplexExpression(curDomain, ";"));
+	std::auto_ptr<Exp_ValueEval> pFalseValue(context.ParseComplexExpression(curDomain));
 	if (!pFalseValue.get()) {
 		context.AddErrorMessage(curT, "Invalid false expression for select.");
 		return NULL;

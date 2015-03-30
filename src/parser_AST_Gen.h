@@ -577,16 +577,14 @@ namespace SC {
 		RootDomain* Parse(const char* content, CodeDomain* pRefDomain);
 		bool ParsePartial(const char* content, CodeDomain* pDomain);
 
-		bool ParseSingleExpression(CodeDomain* curDomain, const char* endT);
+		bool ParseSingleExpression(CodeDomain* curDomain);
 
-		bool ParseCodeDomain(CodeDomain* curDomain, const char* endT);
+		bool ParseCodeDomain(CodeDomain* curDomain);
 		// Simple expression means the expression is in the bracket pair or it is a expression other than a binary operation.
 		//
 		Exp_ValueEval* ParseSimpleExpression(CodeDomain* curDomain);
 		// Complex expression means it contains any simple expression and binary operation.
 		//
-		Exp_ValueEval* ParseComplexExpression(CodeDomain* curDomain, const char* pEndToken0, const char* pEndToken1 = NULL, Exp_ValueEval* pValueExp0 = NULL, Token tOp0 = Token::sInvalid);
-
 		Exp_ValueEval* ParseComplexExpression(CodeDomain* curDomain, Exp_ValueEval* pLeftValueExp = NULL);
 
 	};
