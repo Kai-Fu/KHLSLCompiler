@@ -667,8 +667,9 @@ Exp_StructDef* Exp_StructDef::Parse(CompilingContext& context, CodeDomain* curDo
 	bool succeed = false;
 	std::auto_ptr<Exp_StructDef> pStructDef(new Exp_StructDef(structName, curDomain));
 
-	if (context.ParseCodeDomain(pStructDef.get()))
-		succeed = true;
+	context.ParseCodeDomain(pStructDef.get());
+
+	succeed = !context.HasErrorMessage();
 
 	curT = context.PeekNextToken(0);
 	if (curT.IsEqual("}"))
@@ -984,20 +985,14 @@ bool Exp_VarDef::Parse(CompilingContext& context, CodeDomain* curDomain, std::ve
 		bContinue = context.PeekNextToken(0).IsEqual(",");
 		if (bContinue) context.GetNextToken(); // eat the ","
 	} while (bContinue);
-
-	if (context.PeekNextToken(0).IsEqual(";")) {
-		context.GetNextToken(); // eat the ";"
-				
-		if (!tempOutDefs.empty()) {
-			for (std::list<std::auto_ptr<Exp_VarDef> >::iterator it = tempOutDefs.begin(); it != tempOutDefs.end(); ++it) {
-				out_defs.push_back((*it).release());
-			}
-			return true;
+	
+	if (!tempOutDefs.empty()) {
+		for (std::list<std::auto_ptr<Exp_VarDef> >::iterator it = tempOutDefs.begin(); it != tempOutDefs.end(); ++it) {
+			out_defs.push_back((*it).release());
 		}
-		else
-			return false;
+		return true;
 	}
-	else 
+	else
 		return false;
 }
 
@@ -1042,10 +1037,14 @@ bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain)
 {
 	if (PeekNextToken(0).IsEOF())
 		return false;
-	
+
 	Token firstT = PeekNextToken(0);
 
-	if ((curDomain->mExpAllowedFlag & CodeDomain::kAllowForExp) && PeekNextToken(0).IsEqual("for")) {
+	if (firstT.IsEqual(";")) {
+		GetNextToken();
+		return true;
+	}
+	else if ((curDomain->mExpAllowedFlag & CodeDomain::kAllowForExp) && PeekNextToken(0).IsEqual("for")) {
 		Exp_For* pFor = Exp_For::Parse(*this, curDomain);
 		if (!pFor) {
 			return false;
@@ -1183,8 +1182,8 @@ bool CompilingContext::ParseSingleExpression(CodeDomain* curDomain)
 
 	}
 	else {
-		if (!PeekNextToken(0).IsEOF()) {
-			AddErrorMessage(PeekNextToken(0), "Unexpected expression in current domain.");
+		if (PeekNextToken(0).IsEOF()) {
+			AddErrorMessage(PeekNextToken(0), "Unexpected end of file.");
 			return false;
 		}
 		else
@@ -1708,7 +1707,7 @@ Exp_ValueEval * CompilingContext::ParseComplexExpression(CodeDomain * curDomain,
 		}
 		else {
 			// Check if next binary operator is in higher level of priority
-			GetNextToken(); // Eat the binary operator
+			
 			int op1_level = nextT.GetBinaryOpLevel();
 			std::string op1_str = nextT.ToStdString();
 
@@ -1723,16 +1722,16 @@ Exp_ValueEval * CompilingContext::ParseComplexExpression(CodeDomain * curDomain,
 			}
 			else {
 				if (op1_level > op0_level) {
-					Exp_ValueEval* tempRightExp = ParseComplexExpression(curDomain, simpleRightExp.release());
-					if (tempRightExp) {
-						Exp_BinaryOp* pBinaryOp = new Exp_BinaryOp(op0_str, simpleLeftExp.release(), tempRightExp);
-						ret = pBinaryOp;
+					std::auto_ptr<Exp_ValueEval> tempRightExp(ParseComplexExpression(curDomain, simpleRightExp.release()));
+					if (tempRightExp.get()) {
+						std::auto_ptr<Exp_BinaryOp> pBinaryOp(new Exp_BinaryOp(op0_str, simpleLeftExp.release(), tempRightExp.release()));
+						ret = pBinaryOp.release();
 					}
 				}
 				else {
-					Exp_BinaryOp* pBinaryOpLeft = new Exp_BinaryOp(op0_str, simpleLeftExp.release(), simpleRightExp.release());
-					Exp_ValueEval* simpleExpRet = ParseComplexExpression(curDomain, pBinaryOpLeft);
-					ret = simpleExpRet;
+					std::auto_ptr<Exp_BinaryOp> pBinaryOpLeft(new Exp_BinaryOp(op0_str, simpleLeftExp.release(), simpleRightExp.release()));
+					std::auto_ptr<Exp_ValueEval> simpleExpRet(ParseComplexExpression(curDomain, pBinaryOpLeft.release()));
+					ret = simpleExpRet.release();
 				}
 			}
 			

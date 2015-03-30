@@ -18,10 +18,21 @@ float ExternFunc(MyExtType arg)
 	return 123;
 }
 
+struct MyTestStruct
+{
+	float3 a;
+	float2 b;
+	int c;
+	int4 d;
+	bool2 e;
+	float8 f;
+};
+
 float TestFunc_1(float l) 
 {
 	return sqrt(l);
 }
+
 
 void run_test()
 {
