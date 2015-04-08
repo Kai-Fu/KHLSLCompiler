@@ -150,6 +150,7 @@
     <ClCompile Include="src\parser_AST_Gen.cpp" />
     <ClCompile Include="src\parser_defines.cpp" />
     <ClCompile Include="src\parser_preprocess.cpp" />
+    <ClCompile Include="src\parser_tokenizer.cpp" />
     <ClCompile Include="src\SC_API.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -159,6 +160,7 @@
     <ClInclude Include="src\parser_AST_Gen.h" />
     <ClInclude Include="src\parser_defines.h" />
     <ClInclude Include="src\parser_preprocess.h" />
+    <ClInclude Include="src\parser_tokenizer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

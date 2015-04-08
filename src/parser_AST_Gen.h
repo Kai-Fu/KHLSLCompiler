@@ -6,6 +6,7 @@
 #include <hash_set>
 #include <set>
 #include "parser_defines.h"
+#include "parser_tokenizer.h"
 
 #define WANT_MEM_LEAK_CHECK
 
@@ -18,79 +19,12 @@ namespace llvm {
 namespace SC {
 
 
-	class Token;
-	struct TypeDesc;
 	class Exp_VarDef;
 	class Exp_ValueEval;
 	class CG_Context;
 	class Exp_If;
 	class Exp_For;
 
-	enum KeyWord {
-		kStructDef,
-		kIf,
-		kElse,
-		kFor,
-		kReturn,
-		kTrue,
-		kFalse
-	};
-
-	void Initialize_AST_Gen();
-	void Finish_AST_Gen();
-
-	bool IsBuiltInType(const Token& token, TypeDesc* out_type = NULL);
-	bool IsKeyWord(const Token& token, KeyWord* out_key = NULL);
-
-	class Token
-	{
-	public:
-		enum Type {
-			kIdentifier,
-			kConstInt,
-			kConstFloat,
-			kOpenCurly, // {
-			kCloseCurly, // }
-			kOpenParenthesis, // (
-			kCloseParenthesis, // )
-			kOpenBraket, // [
-			kCloseBraket, // ]
-			kBinaryOp, // +,=,*,/, etc
-			kUnaryOp, // !,
-			kComma,
-			kSemiColon,
-			kQuotation,
-			kPeriod,
-			kString,
-			kUnknown
-		};
-	private:
-		const char* mpData;
-		int mNumOfChar;
-		int mLOC;
-		Type mType;
-	public:
-		static Token sInvalid;
-		static Token sEOF;
-	public:
-		Token();
-		Token(const char* p, int num, int line, Type tp);
-		Token(const Token& ref);
-
-		double GetConstValue() const;
-		int GetBinaryOpLevel() const;
-		Type GetType() const;
-		int GetLOC() const;
-
-		bool IsValid() const;
-		bool IsEOF() const;
-		bool IsEqual(const char* dest) const;
-		bool IsEqual(const Token& dest) const;
-		void ToAnsiString(char* dest) const;
-		const char* GetRawData() const;
-		std::string ToStdString() const;
-	};
-	
 	class DataBlock
 	{
 	private:

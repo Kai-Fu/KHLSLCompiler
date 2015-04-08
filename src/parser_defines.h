@@ -3,6 +3,7 @@
 #include "../inc/SC_API.h"
 #include <vector>
 #include <hash_map>
+#include <string>
 
 namespace llvm {
 	class Function;
@@ -20,7 +21,27 @@ namespace SC {
 	VarType MakeType(VarType baseType, int elemCnt);
 	int ConvertSwizzle(const char* swizzleStr, int swizzleIdx[4]);
 	bool IsTypeCompatible(VarType dest, VarType from, bool& FtoIwarning);
+
+	enum KeyWord {
+		kStructDef,
+		kIf,
+		kElse,
+		kFor,
+		kReturn,
+		kTrue,
+		kFalse
+	};
+
+	struct TypeDesc {
+		VarType type;
+		int elemCnt;
+		bool isInt;
+
+		TypeDesc() { type = VarType::kInvalid; elemCnt = 0; isInt = false; }
+		TypeDesc(VarType tp, int cnt, bool i) { type = tp; elemCnt = cnt; isInt = i; }
+	};
 } // namespace SC
+
 
 
 class KSC_StructDesc : public std::vector<KSC_TypeInfo>
