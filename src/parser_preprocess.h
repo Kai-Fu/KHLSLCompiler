@@ -2,6 +2,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "parser_tokenizer.h"
 
 namespace SC {
 	class Preprocessor
@@ -11,11 +12,15 @@ namespace SC {
 		~Preprocessor();
 	
 	protected:
-		void DoIt(const char* source);
+		void DoIt();
+		void AddProcessedToken(const Token& t);
 
 	private:
-		std::vector<char> mProcessedSource;
+		std::string mProcessedSource;
+		int mCurProcessedLine;
 		std::string mErrMessage;
 		std::map<std::string, std::string> mDefines;
+
+		Tokenizer mTokenizer;
 	};
 }

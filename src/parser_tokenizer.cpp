@@ -306,9 +306,9 @@ namespace SC {
 				break;
 		}
 
-		// Then read the constant string value
+		// Then read the string value
 		// 
-		if (*mCurParsingPtr == '"') {
+		/*if (*mCurParsingPtr == '"') {
 			mCurParsingPtr++; // Skip the starting " token
 
 			std::string newString;
@@ -321,7 +321,9 @@ namespace SC {
 					mCurParsingPtr++;
 					switch (*mCurParsingPtr) {
 					case 'n':
-						newString += "\n";
+						mCurParsingLOC++;
+						break;
+					case ' ':
 						break;
 					default:
 						newString += *mCurParsingPtr;
@@ -336,7 +338,7 @@ namespace SC {
 			}
 
 			return Token(&newString[0], (int)newString.length(), mCurParsingLOC, Token::kString);
-		}
+		}*/
 
 		Token ret = Token::sInvalid;
 		if (*mCurParsingPtr == '\0')
