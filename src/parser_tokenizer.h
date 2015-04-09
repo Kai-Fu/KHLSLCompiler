@@ -6,8 +6,8 @@ namespace SC {
 
 	class Token;
 
-	void Initialize_AST_Gen();
-	void Finish_AST_Gen();
+	void Initialize_Tokenizer();
+	void Finish_Tokenizer();
 
 	bool IsBuiltInType(const Token& token, TypeDesc* out_type = NULL);
 	bool IsKeyWord(const Token& token, KeyWord* out_key = NULL);
@@ -63,16 +63,23 @@ namespace SC {
 
 	class Tokenizer
 	{
-	public:
-		Tokenizer(const char* content);
-		~Tokenizer();
-
-	private:
 		const char* mContentPtr;
 		const char* mCurParsingPtr;
 		int mCurParsingLOC;
 
 		std::list<Token> mBufferedToken;
+		std::string mErrorMessage;
+
+	public:
+		Tokenizer(const char* content);
+		~Tokenizer();
+
+		void Reset(const char* content);
+		Token PeekNextToken(int next_i);
+		Token GetNextToken();
+		bool IsEOF() const;
+	protected:
+		Token ScanForToken(std::string& errorMsg);
 	};
 
 }

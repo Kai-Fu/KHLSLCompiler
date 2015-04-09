@@ -471,15 +471,9 @@ namespace SC {
 	{
 
 	private:
-		const char* mContentPtr;
-		const char* mCurParsingPtr;
-		int mCurParsingLOC;
-
-
-		std::list<Token> mBufferedToken;
+		Tokenizer mTokenizer;
 		std::list<std::pair<Token, std::string> > mErrorMessages;
 		std::list<std::pair<Token, std::string> > mWarningMessages;
-		std::list<std::string> mConstStrings;
 	public:
 		Exp_FunctionDecl* mpCurrentFunc;
 
@@ -489,8 +483,7 @@ namespace SC {
 		bool IsFunctionDefinePartten();
 		bool IsExternalTypeDefParttern();
 		bool IsIfExpPartten();
-		
-		Token ScanForToken(std::string& errorMsg);
+
 
 	public:
 		CompilingContext(const char* content);

@@ -34,7 +34,7 @@ static void SplitStringByDot(const char* inStr, std::vector<std::string>& outStr
 
 bool KSC_Initialize(const char* sharedCode)
 {
-	SC::Initialize_AST_Gen();
+	SC::Initialize_Tokenizer();
 	bool ret = SC::InitializeCodeGen();
 
 	int CPUInfo[4];
@@ -113,7 +113,7 @@ void KSC_Destory()
 	}
 
 	SC::DestoryCodeGen();
-	SC::Finish_AST_Gen();
+	SC::Finish_Tokenizer();
 }
 
 

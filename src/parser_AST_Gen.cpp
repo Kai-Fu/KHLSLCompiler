@@ -8,266 +8,9 @@ namespace SC {
 
 
 
-
-static bool _isAlpha(char ch)
+CompilingContext::CompilingContext(const char* content) :
+	mTokenizer(content)
 {
-	return ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'));
-}
-
-static bool _isNumber(char ch)
-{
-	return (ch >= '0' && ch <= '9');
-}
-
-static bool _isFirstN_Equal(const char* test_str, const char* dest)
-{
-	int i = 0;
-	while (test_str[i] != '\0' && dest[i] != '\0') {
-		if (test_str[i] != dest[i])
-			return false;
-		++i;
-	}
-
-	if (test_str[i] == '\0' && dest[i] != '\0')
-		return false;
-
-	return true;
-}
-
-Token CompilingContext::ScanForToken(std::string& errorMsg)
-{
-	// First skip white space characters and comments
-	//
-	while (1) {
-		const char* beforeSkip = mCurParsingPtr;
-		// Eat the white spaces and new line characters.
-		//
-		while (*mCurParsingPtr == ' ' || *mCurParsingPtr == '\n' || *mCurParsingPtr == '\t') {
-			if (*mCurParsingPtr == '\n')
-				++mCurParsingLOC;
-			++mCurParsingPtr;
-		}
-
-		// Skip the comments, e.g. //... and /* ... */
-		//
-		if (*mCurParsingPtr == '/') {
-
-			if (*(mCurParsingPtr + 1) == '*') {
-				mCurParsingPtr += 2;
-				// Seek for the end of the comments(*/)
-				bool isLastAsterisk = false;
-				while (*mCurParsingPtr != '\0') {
-					if (isLastAsterisk && *mCurParsingPtr == '/')
-						break;
-					if (*mCurParsingPtr == '*') 
-						isLastAsterisk = true;
-					if (*mCurParsingPtr == '\n') 
-						++mCurParsingLOC;
-					++mCurParsingPtr;
-				}
-				if (*mCurParsingPtr == '\0') {
-					errorMsg = "Comments not ended - unexpected end of file.";
-					return Token::sEOF;
-				}
-				else {
-					++mCurParsingPtr; // Skip "/"
-				}
-			}
-			else if (*(mCurParsingPtr + 1) == '/') {
-				mCurParsingPtr += 2;
-				// Go to the end of the line
-				while (*mCurParsingPtr != '\0' && *mCurParsingPtr != '\n') 
-					++mCurParsingPtr;
-
-				if (*mCurParsingPtr == '\n') {
-					mCurParsingLOC++;
-					++mCurParsingPtr;
-				}
-			}
-		}
-
-		// Break from this loop since the pointer doesn't move forward
-		if (beforeSkip == mCurParsingPtr)
-			break;
-	}
-
-	// Then read the constant string value
-	// 
-	if (*mCurParsingPtr == '"') {
-		mCurParsingPtr++; // Skip the starting " token
-		mConstStrings.push_back("");
-		std::string& newString = mConstStrings.back();
-		while (1) {
-			if (*mCurParsingPtr != '\\' && *mCurParsingPtr != '"') {
-				newString += *mCurParsingPtr;
-				mCurParsingPtr++;
-			}
-			else if (*mCurParsingPtr == '\\') {
-				mCurParsingPtr++;
-				switch (*mCurParsingPtr) {
-				case 'n':
-					newString += "\n";
-					break;
-				default:
-					newString += *mCurParsingPtr;
-					break;
-				}
-				mCurParsingPtr++;
-			}
-			else {
-				mCurParsingPtr++;
-				break;
-			}
-		}
-
-		return Token(&newString[0], (int)newString.length(), mCurParsingLOC, Token::kString);
-	}
-
-	Token ret = Token::sInvalid;
-	if (*mCurParsingPtr == '\0') 
-		return Token::sEOF;  // Reach the end of the file
-	
-	// Now it is expecting a token.
-	//
-	if (_isFirstN_Equal(mCurParsingPtr, "++") ||
-		_isFirstN_Equal(mCurParsingPtr, "--") ||
-		_isFirstN_Equal(mCurParsingPtr, "||") ||
-		_isFirstN_Equal(mCurParsingPtr, "&&") ||
-		_isFirstN_Equal(mCurParsingPtr, "==") ||
-		_isFirstN_Equal(mCurParsingPtr, "!=") ||
-		_isFirstN_Equal(mCurParsingPtr, ">=") ||
-		_isFirstN_Equal(mCurParsingPtr, "<=") ) {
-
-		ret = Token(mCurParsingPtr, 2, mCurParsingLOC, Token::kBinaryOp);
-		mCurParsingPtr += 2;
-	}
-	else if (_isFirstN_Equal(mCurParsingPtr, "+") ||
-			 _isFirstN_Equal(mCurParsingPtr, "-") ||
-			 _isFirstN_Equal(mCurParsingPtr, "*") ||
-			 _isFirstN_Equal(mCurParsingPtr, "/") ||
-			 _isFirstN_Equal(mCurParsingPtr, "|") ||
-			 _isFirstN_Equal(mCurParsingPtr, "&") ||
-			 _isFirstN_Equal(mCurParsingPtr, "=") ||
-			 _isFirstN_Equal(mCurParsingPtr, ">") ||
-			 _isFirstN_Equal(mCurParsingPtr, "<") ) {
-
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kBinaryOp);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == '{') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kOpenCurly);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == '}') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kCloseCurly);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == '[') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kOpenBraket);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == ']') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kCloseBraket);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == '(') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kOpenParenthesis);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == ')') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kCloseParenthesis);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == ',') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kComma);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == ';') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kSemiColon);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == '.') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kPeriod);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == '!') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kUnaryOp);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == ':') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kQuotation);
-		++mCurParsingPtr;
-	}
-	else if(*mCurParsingPtr == '?') {
-		ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kBinaryOp);
-		++mCurParsingPtr;
-	}
-	else {
-		// Now handling for constants for identifiers
-		bool isFirstCharNumber = _isNumber(*mCurParsingPtr);
-		if (!isFirstCharNumber && !_isAlpha(*mCurParsingPtr) && *mCurParsingPtr != '_') {
-			// Unrecoginzed character
-			return Token(mCurParsingPtr++, 1, mCurParsingLOC, Token::kUnknown);
-		}
-
-		const char* pFirstCh = mCurParsingPtr;
-		int idLen = 0;
-		while (	*mCurParsingPtr != '\0' &&
-				(_isAlpha(*mCurParsingPtr) ||
-				_isNumber(*mCurParsingPtr) ||
-				*mCurParsingPtr == '_')) {
-			idLen++;
-			++mCurParsingPtr;
-		}
-		bool hasNonNumber = false;
-		for (int i = 0; i < idLen; ++i) {
-			if (!_isNumber(pFirstCh[i]))
-				hasNonNumber = true;
-		}
-
-		if (isFirstCharNumber && hasNonNumber) {
-			errorMsg = "Invalid identifier - ";
-			errorMsg.append(pFirstCh, idLen);
-			return Token(NULL, 0, mCurParsingLOC, Token::kUnknown);
-		}
-
-		bool isFloat = false;
-		if (isFirstCharNumber) {
-			// check for decimal point, e.g. 123.456e-8f
-			if (*mCurParsingPtr == '.') {
-				isFloat = true;
-				mCurParsingPtr++;
-				while (_isNumber(*mCurParsingPtr)) 
-					mCurParsingPtr++;
-			}
-
-			if (*mCurParsingPtr == 'e' || *mCurParsingPtr == 'E') {
-				mCurParsingPtr++;
-
-				if (*mCurParsingPtr == '+' || *mCurParsingPtr == '-')
-					mCurParsingPtr++;
-
-				while (_isNumber(*mCurParsingPtr)) 
-					mCurParsingPtr++;
-			}
-
-			if (*mCurParsingPtr == 'f' || *mCurParsingPtr == 'F')
-				mCurParsingPtr++;
-		}
-		
-		ret = Token(pFirstCh, int(mCurParsingPtr - pFirstCh), mCurParsingLOC, isFirstCharNumber ? 
-			(isFloat ? Token::kConstFloat : Token::kConstInt) : 
-			Token::kIdentifier);
-	}
-
-	return ret;
-}
-
-CompilingContext::CompilingContext(const char* content)
-{
-	mContentPtr = content;
-	mCurParsingPtr = mContentPtr;
-	mCurParsingLOC = 0;
 	mpCurrentFunc = NULL;
 }
 
@@ -278,11 +21,8 @@ CompilingContext::~CompilingContext()
 
 RootDomain* CompilingContext::Parse(const char* content, CodeDomain* pRefDomain)
 {
-	mBufferedToken.clear();
+	mTokenizer.Reset(content);
 	mErrorMessages.clear();
-	mContentPtr = content;
-	mCurParsingPtr = mContentPtr;
-	mCurParsingLOC = 1;
 
 	RootDomain* rootDomain = new RootDomain(pRefDomain);
 	while (ParseSingleExpression(rootDomain));
@@ -298,11 +38,8 @@ RootDomain* CompilingContext::Parse(const char* content, CodeDomain* pRefDomain)
 
 bool CompilingContext::ParsePartial(const char* content, CodeDomain* pDomain)
 {
-	mBufferedToken.clear();
+	mTokenizer.Reset(content);
 	mErrorMessages.clear();
-	mContentPtr = content;
-	mCurParsingPtr = mContentPtr;
-	mCurParsingLOC = 1;
 
 	while (ParseSingleExpression(pDomain));
 
@@ -316,46 +53,13 @@ bool CompilingContext::ParsePartial(const char* content, CodeDomain* pDomain)
 
 Token CompilingContext::GetNextToken()
 {
-	Token ret = PeekNextToken(0);
-	if (ret.IsValid()) {
-		mBufferedToken.erase(mBufferedToken.begin());
-	}
-	return ret;
+	return mTokenizer.GetNextToken();
 }
 
 Token CompilingContext::PeekNextToken(int next_i)
 {
-	int charParsed = 0;
-	int lineParsed = 0;
-
-	int tokenNeeded = 0;
-	if ((int)mBufferedToken.size() <= next_i) 
-		tokenNeeded = next_i -  (int)mBufferedToken.size() + 1;
-	
-	for (int i = 0; i < tokenNeeded; ++i) {
-		std::string errMsg;
-		Token ret = ScanForToken(errMsg);
-
-		if (ret.IsValid()) {
-			mBufferedToken.push_back(ret);
-		}
-		else {
-			if (!errMsg.empty())
-				AddErrorMessage(Token(NULL, 0, mCurParsingLOC, Token::kUnknown), errMsg);
-			break;
-		}
-	}
-
-	if ((int)mBufferedToken.size() > next_i) {
-		std::list<Token>::iterator it = mBufferedToken.begin();
-		int itCnt = next_i;
-		while (itCnt-- > 0) ++it;
-		return *it;
-	}
-	else 
-		return mErrorMessages.empty() ? Token::sEOF : Token::sInvalid;
+	return mTokenizer.PeekNextToken(next_i);
 }
-
 
 void DataBlock::AddFloat(Float f)
 {
@@ -793,7 +497,7 @@ bool Exp_VarDef::Parse(CompilingContext& context, CodeDomain* curDomain, std::ve
 
 bool CompilingContext::IsEOF() const
 {
-	return (*mCurParsingPtr == '\0');
+	return mTokenizer.IsEOF();
 }
 
 
