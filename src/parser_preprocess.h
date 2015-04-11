@@ -15,6 +15,7 @@ namespace SC {
 		void DoIt();
 		void AddProcessedToken(const Token& t);
 
+		bool HandleMacroDefine();
 	private:
 		std::string mProcessedSource;
 		int mCurProcessedLine;

@@ -419,6 +419,21 @@ namespace SC {
 			ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kBinaryOp);
 			++mCurParsingPtr;
 		}
+		else if (*mCurParsingPtr == '#') {
+			if (_isFirstN_Equal(mCurParsingPtr, "#define")) {
+				size_t len = strlen("#define");
+				ret = Token(mCurParsingPtr, (int)len, mCurParsingLOC, Token::kSharpDefine);
+				mCurParsingPtr += len;
+			}
+			else if (_isFirstN_Equal(mCurParsingPtr, "##")) {
+				ret = Token(mCurParsingPtr, 2, mCurParsingLOC, Token::kDoubleSharp);
+				mCurParsingPtr += 2;
+			}
+			else {
+				ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kDoubleSharp);
+				++mCurParsingPtr;
+			}
+		}
 		else {
 			// Now handling for constants for identifiers
 			bool isFirstCharNumber = _isNumber(*mCurParsingPtr);

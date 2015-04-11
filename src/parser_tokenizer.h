@@ -32,6 +32,8 @@ namespace SC {
 			kQuotation,
 			kPeriod,
 			kString,
+			kSharpDefine, // #define
+			kDoubleSharp, // ##
 			kUnknown
 		};
 	private:
