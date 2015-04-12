@@ -2,6 +2,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <memory>
 #include "parser_tokenizer.h"
 
 namespace SC {
@@ -20,7 +21,12 @@ namespace SC {
 		std::string mProcessedSource;
 		int mCurProcessedLine;
 		std::string mErrMessage;
-		std::map<std::string, std::string> mDefines;
+
+		struct MacroDefine {
+			std::vector<Token> arguments;
+			std::vector<Token> tokenSequence;
+		};
+		std::map<std::string, MacroDefine> mDefines;
 
 		Tokenizer mTokenizer;
 	};

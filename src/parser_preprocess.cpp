@@ -23,7 +23,7 @@ void Preprocessor::DoIt()
 		Token curT = mTokenizer.PeekNextToken(0);
 		
 		if (curT.IsEqual("#define")) {
-			
+			HandleMacroDefine();
 		}
 		else {
 			AddProcessedToken(curT);
@@ -57,23 +57,59 @@ bool SC::Preprocessor::HandleMacroDefine()
 		mErrMessage = "Invalid macro define.";
 		return false;
 	}
-
+	int codeLine = t0.GetLOC();
 	mTokenizer.GetNextToken();
 	mTokenizer.GetNextToken();
 
 	Token t3 = mTokenizer.PeekNextToken(0);
-	if (t3.GetLOC() != t1.GetLOC()) {
+	if (t3.GetLOC() != codeLine) {
 		// This macro is empty #define
-		mDefines[t1.ToStdString()] = "";
+		mDefines[t1.ToStdString()].arguments.clear();
+		mDefines[t1.ToStdString()].tokenSequence.clear();
 		return true;
 	}
 	else {
-		std::string macroString;
-		while (t3.GetLOC() == t1.GetLOC()) {
-			macroString += t3.ToStdString();
-			t3 = mTokenizer.GetNextToken();
+		std::vector<Token> arguments;
+		std::vector<Token> tokenSequence;
+		
+		mTokenizer.GetNextToken();
+		if (mTokenizer.PeekNextToken(0).IsEqual("(")) {
+			// Macro with arguments
+			mTokenizer.GetNextToken();
+
+			while (1) {
+				Token arg = mTokenizer.GetNextToken();
+				Token commaOrEnd = mTokenizer.GetNextToken();
+
+				if (arg.GetLOC() != codeLine || commaOrEnd.GetLOC() != codeLine) {
+					mErrMessage = "Expect argument of #define.";
+					return false;
+				}
+
+				if (arg.GetType() != Token::kIdentifier) {
+					mErrMessage = "Expect identifier after #define.";
+					return false;
+				}
+				if (!commaOrEnd.IsEqual(",") && !commaOrEnd.IsEqual(")")) {
+					mErrMessage = "Invalid argument of #define.";
+					return false;
+				}
+				arguments.push_back(arg);
+
+				if (commaOrEnd.IsEqual(")"))
+					break;
+			}
+
 		}
-		mDefines[t1.ToStdString()] = macroString;
+
+		while (mTokenizer.PeekNextToken(0).GetLOC() == codeLine &&
+			!mTokenizer.PeekNextToken(0).IsEOF()) {
+			tokenSequence.push_back(mTokenizer.GetNextToken());
+		}
+
+		mDefines[t1.ToStdString()].arguments = arguments;
+		mDefines[t1.ToStdString()].tokenSequence = tokenSequence;
+
 		return true;
 	}
 }
