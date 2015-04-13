@@ -1,11 +1,11 @@
 #include "parser_preprocess.h"
+#include "parser_tokenizer.h"
 
-using namespace SC;
+using namespace SC_Prep;
 
-Preprocessor::Preprocessor(const char* source) :
-	mTokenizer(source)
+Preprocessor::Preprocessor() 
 {
-	DoIt();
+	
 }
 
 Preprocessor::~Preprocessor()
@@ -13,104 +13,95 @@ Preprocessor::~Preprocessor()
 
 }
 
-void Preprocessor::DoIt()
+void SC_Prep::Preprocessor::WriteToSting(std::string & processedCode) const
 {
-	mCurProcessedLine = 1;
-	mProcessedSource.clear();
+	size_t len = 0;
+	for (auto& line : mProcessedSource) 
+		len += line.code.length() + 1;
+	
+	processedCode.reserve(len);
+	int curLine = 1;
+	for (auto& line : mProcessedSource) {
+		while (curLine++ < line.loc) {
+			processedCode += "\n";
+		}
+		processedCode += line.code;
+		processedCode += "\n";
+	}
 
+}
+
+void NoComments::DoIt(const char* source)
+{
+	const char* pCurParsingPtr = source;
+	int parsedCodeLine = 1;
+	
 	while (1) {
-
-		Token curT = mTokenizer.PeekNextToken(0);
-		
-		if (curT.IsEqual("#define")) {
-			HandleMacroDefine();
+		const char* beforeSkip = pCurParsingPtr;
+		// Eat the white spaces and new line characters.
+		//
+		while (*pCurParsingPtr == '\n' || *pCurParsingPtr == '\t') {
+			if (*pCurParsingPtr == '\n')
+				mProcessedSource.push_back(CodeLine(parsedCodeLine++));
+			else
+				mProcessedSource.back().code += *pCurParsingPtr;
 		}
-		else {
-			AddProcessedToken(curT);
-			mTokenizer.GetNextToken();
-		}
-		if (curT.IsEOF())
-			break;
-	}
 
-}
+		// Skip the comments, e.g. //... and /* ... */
+		//
+		if (SC::IsFirstN_Equal(pCurParsingPtr, "/*")) {
 
-void SC::Preprocessor::AddProcessedToken(const Token & t)
-{
-	while (t.GetLOC() > mCurProcessedLine) {
-		mProcessedSource += "\n";
-		mCurProcessedLine++;
-	}
-	mProcessedSource += t.ToStdString();
-}
-
-bool SC::Preprocessor::HandleMacroDefine()
-{
-	Token t0 = mTokenizer.PeekNextToken(0);
-	Token t1 = mTokenizer.PeekNextToken(1);
-	if (t0.GetLOC() != t1.GetLOC()) {
-		mErrMessage = "Expect identifier after #define.";
-		return false;
-	}
-
-	if (!t0.IsEqual("#define") || t1.GetType() != Token::kIdentifier) {
-		mErrMessage = "Invalid macro define.";
-		return false;
-	}
-	int codeLine = t0.GetLOC();
-	mTokenizer.GetNextToken();
-	mTokenizer.GetNextToken();
-
-	Token t3 = mTokenizer.PeekNextToken(0);
-	if (t3.GetLOC() != codeLine) {
-		// This macro is empty #define
-		mDefines[t1.ToStdString()].arguments.clear();
-		mDefines[t1.ToStdString()].tokenSequence.clear();
-		return true;
-	}
-	else {
-		std::vector<Token> arguments;
-		std::vector<Token> tokenSequence;
-		
-		mTokenizer.GetNextToken();
-		if (mTokenizer.PeekNextToken(0).IsEqual("(")) {
-			// Macro with arguments
-			mTokenizer.GetNextToken();
-
-			while (1) {
-				Token arg = mTokenizer.GetNextToken();
-				Token commaOrEnd = mTokenizer.GetNextToken();
-
-				if (arg.GetLOC() != codeLine || commaOrEnd.GetLOC() != codeLine) {
-					mErrMessage = "Expect argument of #define.";
-					return false;
-				}
-
-				if (arg.GetType() != Token::kIdentifier) {
-					mErrMessage = "Expect identifier after #define.";
-					return false;
-				}
-				if (!commaOrEnd.IsEqual(",") && !commaOrEnd.IsEqual(")")) {
-					mErrMessage = "Invalid argument of #define.";
-					return false;
-				}
-				arguments.push_back(arg);
-
-				if (commaOrEnd.IsEqual(")"))
+			pCurParsingPtr += 2;
+			// Seek for the end of the comments(*/)
+			bool isLastAsterisk = false;
+			while (*pCurParsingPtr != '\0') {
+				if (isLastAsterisk && *pCurParsingPtr == '/')
 					break;
+				if (*pCurParsingPtr == '*')
+					isLastAsterisk = true;
+				if (*pCurParsingPtr == '\n')
+					mProcessedSource.push_back(CodeLine(parsedCodeLine++));
+				pCurParsingPtr++;
 			}
-
+			if (*pCurParsingPtr == '\0') {
+				mErrMessage = "Comments not ended - unexpected end of file.";
+				return;
+			}
+		
+			continue;
 		}
 
-		while (mTokenizer.PeekNextToken(0).GetLOC() == codeLine &&
-			!mTokenizer.PeekNextToken(0).IsEOF()) {
-			tokenSequence.push_back(mTokenizer.GetNextToken());
+		// For comments starting with // ...
+		//
+		if (SC::IsFirstN_Equal(pCurParsingPtr, "//")) {
+			pCurParsingPtr += 2;
+			// Go to the end of the line
+			while (*pCurParsingPtr != '\0' && *pCurParsingPtr != '\n')
+				++pCurParsingPtr;
+
+			if (*pCurParsingPtr == '\n') {
+				mProcessedSource.push_back(CodeLine(parsedCodeLine++));
+				pCurParsingPtr++;
+			}
+			continue;
 		}
 
-		mDefines[t1.ToStdString()].arguments = arguments;
-		mDefines[t1.ToStdString()].tokenSequence = tokenSequence;
+		// Process the "\" token at the end of line
+		//
+		if (SC::IsFirstN_Equal(pCurParsingPtr, "//\n")) {
+			pCurParsingPtr += 2;
+			parsedCodeLine++;
+			continue;
+		}
 
-		return true;
+		// Break from this loop since the pointer doesn't move forward
+		if (beforeSkip == pCurParsingPtr)
+			break;
+
+		mProcessedSource.back().code += *pCurParsingPtr;
 	}
 }
 
+void SC_Prep::DefineHandler::DoIt(const char * source)
+{
+}

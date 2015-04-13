@@ -89,7 +89,7 @@ namespace SC {
 		return (ch >= '0' && ch <= '9');
 	}
 
-	static bool _isFirstN_Equal(const char* test_str, const char* dest)
+	bool IsFirstN_Equal(const char* test_str, const char* dest)
 	{
 		int i = 0;
 		while (test_str[i] != '\0' && dest[i] != '\0') {
@@ -346,27 +346,27 @@ namespace SC {
 
 								 // Now it is expecting a token.
 								 //
-		if (_isFirstN_Equal(mCurParsingPtr, "++") ||
-			_isFirstN_Equal(mCurParsingPtr, "--") ||
-			_isFirstN_Equal(mCurParsingPtr, "||") ||
-			_isFirstN_Equal(mCurParsingPtr, "&&") ||
-			_isFirstN_Equal(mCurParsingPtr, "==") ||
-			_isFirstN_Equal(mCurParsingPtr, "!=") ||
-			_isFirstN_Equal(mCurParsingPtr, ">=") ||
-			_isFirstN_Equal(mCurParsingPtr, "<=")) {
+		if (IsFirstN_Equal(mCurParsingPtr, "++") ||
+			IsFirstN_Equal(mCurParsingPtr, "--") ||
+			IsFirstN_Equal(mCurParsingPtr, "||") ||
+			IsFirstN_Equal(mCurParsingPtr, "&&") ||
+			IsFirstN_Equal(mCurParsingPtr, "==") ||
+			IsFirstN_Equal(mCurParsingPtr, "!=") ||
+			IsFirstN_Equal(mCurParsingPtr, ">=") ||
+			IsFirstN_Equal(mCurParsingPtr, "<=")) {
 
 			ret = Token(mCurParsingPtr, 2, mCurParsingLOC, Token::kBinaryOp);
 			mCurParsingPtr += 2;
 		}
-		else if (_isFirstN_Equal(mCurParsingPtr, "+") ||
-			_isFirstN_Equal(mCurParsingPtr, "-") ||
-			_isFirstN_Equal(mCurParsingPtr, "*") ||
-			_isFirstN_Equal(mCurParsingPtr, "/") ||
-			_isFirstN_Equal(mCurParsingPtr, "|") ||
-			_isFirstN_Equal(mCurParsingPtr, "&") ||
-			_isFirstN_Equal(mCurParsingPtr, "=") ||
-			_isFirstN_Equal(mCurParsingPtr, ">") ||
-			_isFirstN_Equal(mCurParsingPtr, "<")) {
+		else if (IsFirstN_Equal(mCurParsingPtr, "+") ||
+			IsFirstN_Equal(mCurParsingPtr, "-") ||
+			IsFirstN_Equal(mCurParsingPtr, "*") ||
+			IsFirstN_Equal(mCurParsingPtr, "/") ||
+			IsFirstN_Equal(mCurParsingPtr, "|") ||
+			IsFirstN_Equal(mCurParsingPtr, "&") ||
+			IsFirstN_Equal(mCurParsingPtr, "=") ||
+			IsFirstN_Equal(mCurParsingPtr, ">") ||
+			IsFirstN_Equal(mCurParsingPtr, "<")) {
 
 			ret = Token(mCurParsingPtr, 1, mCurParsingLOC, Token::kBinaryOp);
 			++mCurParsingPtr;
@@ -420,12 +420,12 @@ namespace SC {
 			++mCurParsingPtr;
 		}
 		else if (*mCurParsingPtr == '#') {
-			if (_isFirstN_Equal(mCurParsingPtr, "#define")) {
+			if (IsFirstN_Equal(mCurParsingPtr, "#define")) {
 				size_t len = strlen("#define");
 				ret = Token(mCurParsingPtr, (int)len, mCurParsingLOC, Token::kSharpDefine);
 				mCurParsingPtr += len;
 			}
-			else if (_isFirstN_Equal(mCurParsingPtr, "##")) {
+			else if (IsFirstN_Equal(mCurParsingPtr, "##")) {
 				ret = Token(mCurParsingPtr, 2, mCurParsingLOC, Token::kDoubleSharp);
 				mCurParsingPtr += 2;
 			}

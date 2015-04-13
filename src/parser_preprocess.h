@@ -3,31 +3,42 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "parser_tokenizer.h"
 
-namespace SC {
+namespace SC_Prep {
+
 	class Preprocessor
 	{
 	public:
-		Preprocessor(const char* source);
-		~Preprocessor();
-	
-	protected:
-		void DoIt();
-		void AddProcessedToken(const Token& t);
+		struct CodeLine
+		{
+			int loc;
+			std::string code;
 
-		bool HandleMacroDefine();
-	private:
-		std::string mProcessedSource;
-		int mCurProcessedLine;
+			CodeLine(int l) { loc = l; }
+		};
+		std::vector<CodeLine> mProcessedSource;
 		std::string mErrMessage;
 
-		struct MacroDefine {
-			std::vector<Token> arguments;
-			std::vector<Token> tokenSequence;
-		};
-		std::map<std::string, MacroDefine> mDefines;
+	public:
+		Preprocessor();
+		virtual ~Preprocessor();
 
-		Tokenizer mTokenizer;
+		const char* GetErrorMessage() const { return mErrMessage.c_str(); }
+		void WriteToSting(std::string& processedCode) const;
+	protected:
+		virtual void DoIt(const char* source) = 0;
+
+	};
+
+	class NoComments : public Preprocessor
+	{
+	protected:
+		virtual void DoIt(const char* source);
+	};
+
+	class DefineHandler : public Preprocessor
+	{
+	protected:
+		virtual void DoIt(const char* source);
 	};
 }

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <list>
 #include "parser_defines.h"
 
@@ -11,6 +11,7 @@ namespace SC {
 
 	bool IsBuiltInType(const Token& token, TypeDesc* out_type = NULL);
 	bool IsKeyWord(const Token& token, KeyWord* out_key = NULL);
+	bool IsFirstN_Equal(const char* test_str, const char* dest);
 
 	class Token
 	{
