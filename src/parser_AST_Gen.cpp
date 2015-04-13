@@ -1,4 +1,5 @@
 #include "parser_AST_Gen.h"
+#include "parser_preprocess.h"
 #include <stdio.h>
 #include <assert.h>
 
@@ -21,6 +22,8 @@ CompilingContext::~CompilingContext()
 
 RootDomain* CompilingContext::Parse(const char* content, CodeDomain* pRefDomain)
 {
+	SC_Prep::NoComments noComments;
+	noComments.DoIt(content);
 	mTokenizer.Reset(content);
 	mErrorMessages.clear();
 

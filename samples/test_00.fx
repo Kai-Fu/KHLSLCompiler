@@ -1,10 +1,19 @@
 // This is comments..
-
+/* comments   */
 float TestFunc_0(float l, float r) 
 {
 	return pow(l, r);
 }
+/*
 
+
+*/
+
+/* another type of comments
+  1. bla bla
+  2. bla 
+  
+ */
 extern MyExtType;
 extern MyExtType1;
 
@@ -41,3 +50,6 @@ void run_test()
 	float res1 = TestFunc_1(2);
 	CompareTwoInt(res0*1000, res1*1000);
 }
+
+/* comment at the end of file 
+ */
