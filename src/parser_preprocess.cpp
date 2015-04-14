@@ -40,20 +40,49 @@ void NoComments::DoIt(const char* source)
 		pCurParsingPtr = pass0Result.c_str();
 		std::regex commentPattern("//.*$");
 		std::cmatch searchResult;
-		while (1) {
-			if (!std::regex_search(pCurParsingPtr, searchResult, commentPattern)) {
-				mProcessedSource += pCurParsingPtr;
-				break;
-			}
-
-			mProcessedSource.append(pCurParsingPtr, searchResult[0].first);
-			mProcessedSource += "\n";
-			pCurParsingPtr = searchResult[0].second;
-		}
+		mProcessedSource = std::regex_replace(pass0Result, commentPattern, "");
 	}
 	
+}
+
+void SC_Prep::NoMultiLines::DoIt(const char * source)
+{
+	const char* pCurParsingPtr = source;
+
+	std::regex linePattern("^.*$");
+	std::regex multiLinePattern("\\\\[:blank:]*$");
+	std::cmatch re;
+	int pendNewline = 0;
+	bool isLastMultiLine = false;
+	while (1) {
+		if (!std::regex_search(pCurParsingPtr, re, linePattern)) {
+			mProcessedSource += pCurParsingPtr;
+			break;
+		}
+		pendNewline++;
+
+		const char* lineStart = re[0].first;
+		const char* lineEnd = re[0].second;
+
+		if (std::regex_search(re[0].first, re[0].second, re, multiLinePattern)) {
+			// This line is not ended
+			mProcessedSource.append(lineStart, re[0].first);
+			isLastMultiLine = true;
+		}
+		else {
+			mProcessedSource.append(lineStart, lineEnd);
+			isLastMultiLine = false;
+		}
+
+		if (!isLastMultiLine) {
+			while (pendNewline-- > 0)
+				mProcessedSource += "\n";
+		}
+
+	}
 }
 
 void SC_Prep::DefineHandler::DoIt(const char * source)
 {
 }
+

@@ -27,6 +27,12 @@ namespace SC_Prep {
 		virtual void DoIt(const char* source);
 	};
 
+	class NoMultiLines : public Preprocessor
+	{
+	public:
+		virtual void DoIt(const char* source);
+	};
+
 	class DefineHandler : public Preprocessor
 	{
 	public:
