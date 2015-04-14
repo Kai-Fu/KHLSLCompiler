@@ -22,8 +22,17 @@ CompilingContext::~CompilingContext()
 
 RootDomain* CompilingContext::Parse(const char* content, CodeDomain* pRefDomain)
 {
-	SC_Prep::NoComments noComments;
-	noComments.DoIt(content);
+	std::string preprocessedContent;
+	{
+		SC_Prep::NoComments noComments;
+		noComments.DoIt(content);
+		preprocessedContent.swap(noComments.mProcessedSource);
+
+		SC_Prep::NoMultiLines noMultiLine;
+		noMultiLine.DoIt(preprocessedContent.c_str());
+		preprocessedContent.swap(noMultiLine.mProcessedSource);
+
+	}
 	mTokenizer.Reset(content);
 	mErrorMessages.clear();
 

@@ -49,10 +49,10 @@ void SC_Prep::NoMultiLines::DoIt(const char * source)
 {
 	const char* pCurParsingPtr = source;
 
-	std::regex linePattern("^.*$");
+	std::regex linePattern("^.*\n");
 	std::regex multiLinePattern("\\\\[:blank:]*$");
 	std::cmatch re;
-	int pendNewline = 0;
+	int pendNewline = -1;
 	bool isLastMultiLine = false;
 	while (1) {
 		if (!std::regex_search(pCurParsingPtr, re, linePattern)) {
@@ -63,6 +63,7 @@ void SC_Prep::NoMultiLines::DoIt(const char * source)
 
 		const char* lineStart = re[0].first;
 		const char* lineEnd = re[0].second;
+		pCurParsingPtr = lineEnd;
 
 		if (std::regex_search(re[0].first, re[0].second, re, multiLinePattern)) {
 			// This line is not ended
