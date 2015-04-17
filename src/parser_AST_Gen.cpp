@@ -32,6 +32,10 @@ RootDomain* CompilingContext::Parse(const char* content, CodeDomain* pRefDomain)
 		noMultiLine.DoIt(preprocessedContent.c_str());
 		preprocessedContent.swap(noMultiLine.mProcessedSource);
 
+		SC_Prep::DefineHandler defineHandler;
+		defineHandler.DoIt(preprocessedContent.c_str());
+		preprocessedContent.swap(defineHandler.mProcessedSource);
+
 	}
 	mTokenizer.Reset(content);
 	mErrorMessages.clear();

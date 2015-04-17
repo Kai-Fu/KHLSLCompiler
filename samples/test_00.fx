@@ -43,7 +43,7 @@ float TestFunc_1(float l)
 	return sqrt(l);
 }
 
-
+#define MY_VALUE(x, y, z) (x + y * z + 123.45)
 void run_test()
 {
 

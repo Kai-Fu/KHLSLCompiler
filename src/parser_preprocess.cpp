@@ -4,6 +4,14 @@
 
 using namespace SC_Prep;
 
+#define RE_Token "[[:alpha:]_]\\w*"
+#define RE_P_Start "\\("
+#define RE_P_End "\\)"
+#define RE_NOT_P_End "[^\\)]"
+#define RE_Slash "\\\\"
+#define RE_Blank_Exp "[[:blank:]]+"
+#define RE_Blank_Imp "[[:blank:]]*"
+
 Preprocessor::Preprocessor() 
 {
 	
@@ -50,7 +58,7 @@ void SC_Prep::NoMultiLines::DoIt(const char * source)
 	const char* pCurParsingPtr = source;
 
 	std::regex linePattern("^.*\n");
-	std::regex multiLinePattern("\\\\[:blank:]*$");
+	std::regex multiLinePattern("\\\\[[:blank:]]*$");
 	std::cmatch re;
 	int pendNewline = -1;
 	bool isLastMultiLine = false;
@@ -83,7 +91,72 @@ void SC_Prep::NoMultiLines::DoIt(const char * source)
 	}
 }
 
+
 void SC_Prep::DefineHandler::DoIt(const char * source)
 {
+	const char* pCurParsingPtr = source;
+
+	std::regex linePattern("^.*\n");
+
+	std::regex defineParttenWithArg(
+		"#define" RE_Blank_Exp "(" RE_Token ")" RE_Blank_Imp 
+		RE_P_Start "(" RE_NOT_P_End"+" ")" RE_P_End RE_Blank_Imp "(.*)\n");
+
+	std::regex defineParttenWithoutArg(
+		"#define" RE_Blank_Exp "(" RE_Token ")" RE_Blank_Exp "(.*)\n");
+
+	std::regex argExtractingPartten(
+		RE_Blank_Imp "(" RE_Token ")" RE_Blank_Imp "," );
+
+	//std::regex defineParttenWithArg("#define[[:blank:]]+.*$");
+	std::cmatch re;
+
+	struct MacroDefine
+	{
+		std::vector<std::string> arguments;
+		std::string definedString;
+	};
+	std::map<std::string, MacroDefine> defineMap;
+	while (1) {
+		if (!std::regex_search(pCurParsingPtr, re, linePattern)) {
+			mProcessedSource += pCurParsingPtr;
+			break;
+		}
+
+		const char* lineStart = re[0].first;
+		const char* lineEnd = re[0].second;
+		pCurParsingPtr = lineEnd;
+		if (std::regex_match(lineStart, lineEnd, re, defineParttenWithArg)) {
+
+			std::string macroName = re[1].str();
+			std::string definedString = re[3].str();
+
+			std::string args = re[2].str() + ",";
+			std::vector<std::string> argsList;
+			const char* argString = args.c_str();
+			while (std::regex_search(argString, re, argExtractingPartten)) {
+				argString = re[0].second;
+				argsList.push_back(re[1].str());
+			}
+
+			if (*argString != '\0') {
+				mErrMessage = "Invalid macro define arguments.";
+				return;
+			}
+			
+			defineMap[macroName].definedString = definedString;
+			defineMap[macroName].arguments = argsList;
+		}
+		else if (std::regex_match(lineStart, lineEnd, re, defineParttenWithoutArg)) {
+			// This line is a valid macro define
+			defineMap[re[1].str()].definedString = re[2].str();
+			// Move to the next line
+			mProcessedSource += "\n";
+		}
+		else {
+			mProcessedSource.append(lineStart, lineEnd);
+		}
+
+	}
 }
 
