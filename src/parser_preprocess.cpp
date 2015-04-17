@@ -98,6 +98,8 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 
 	std::regex linePattern("^.*\n");
 
+	std::regex defineStartPartten("^" RE_Blank_Imp "#define" RE_Blank_Exp);
+
 	std::regex defineParttenWithArg(
 		"#define" RE_Blank_Exp "(" RE_Token ")" RE_Blank_Imp 
 		RE_P_Start "(" RE_NOT_P_End"+" ")" RE_P_End RE_Blank_Imp "(.*)\n");
@@ -126,37 +128,43 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 		const char* lineStart = re[0].first;
 		const char* lineEnd = re[0].second;
 		pCurParsingPtr = lineEnd;
-		if (std::regex_match(lineStart, lineEnd, re, defineParttenWithArg)) {
 
-			std::string macroName = re[1].str();
-			std::string definedString = re[3].str();
+		if (std::regex_search(lineStart, lineEnd, re, defineStartPartten)) {
+			// This line is a macro definition
+			if (std::regex_match(lineStart, lineEnd, re, defineParttenWithArg)) {
 
-			std::string args = re[2].str() + ",";
-			std::vector<std::string> argsList;
-			const char* argString = args.c_str();
-			while (std::regex_search(argString, re, argExtractingPartten)) {
-				argString = re[0].second;
-				argsList.push_back(re[1].str());
+				std::string macroName = re[1].str();
+				std::string definedString = re[3].str();
+
+				std::string args = re[2].str() + ",";
+				std::vector<std::string> argsList;
+				const char* argString = args.c_str();
+				while (std::regex_search(argString, re, argExtractingPartten)) {
+					argString = re[0].second;
+					argsList.push_back(re[1].str());
+				}
+
+				if (*argString != '\0') {
+					mErrMessage = "Invalid macro define arguments.";
+					return;
+				}
+
+				defineMap[macroName].definedString = definedString;
+				defineMap[macroName].arguments = argsList;
+			}
+			else if (std::regex_match(lineStart, lineEnd, re, defineParttenWithoutArg)) {
+				// This line is a valid macro define
+				defineMap[re[1].str()].definedString = re[2].str();
 			}
 
-			if (*argString != '\0') {
-				mErrMessage = "Invalid macro define arguments.";
-				return;
-			}
-			
-			defineMap[macroName].definedString = definedString;
-			defineMap[macroName].arguments = argsList;
-		}
-		else if (std::regex_match(lineStart, lineEnd, re, defineParttenWithoutArg)) {
-			// This line is a valid macro define
-			defineMap[re[1].str()].definedString = re[2].str();
 			// Move to the next line
 			mProcessedSource += "\n";
 		}
 		else {
+			// This line is NOT macro definition, I need to handle the macro expanding.
+
 			mProcessedSource.append(lineStart, lineEnd);
 		}
 
 	}
 }
-
