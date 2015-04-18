@@ -43,11 +43,11 @@ float TestFunc_1(float l)
 	return sqrt(l);
 }
 
-#define MY_VALUE(x, y, z) (x + y * z + 123.45)
+#define MY_VALUE 123.45
 void run_test()
 {
 
-	float res0 = TestFunc_0(2, 0.5);
+	float res0 = TestFunc_0(2, MY_VALUE);
 	float res1 = TestFunc_1(2);
 	CompareTwoInt(res0*1000, res1*1000);
 }

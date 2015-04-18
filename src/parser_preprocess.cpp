@@ -115,10 +115,14 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 
 	struct MacroDefine
 	{
-		std::vector<std::string> arguments;
-		std::string definedString;
+		std::string macroName;
+		std::regex searchPartten;
+		std::string replacePartten;
+		bool isRedefined;
 	};
-	std::map<std::string, MacroDefine> defineMap;
+	std::vector<MacroDefine> macroDefines;
+	// Search map to check if the macro is re-define an existing one.
+	std::map<std::string, size_t> defineRefs;
 	while (1) {
 		if (!std::regex_search(pCurParsingPtr, re, linePattern)) {
 			mProcessedSource += pCurParsingPtr;
@@ -130,9 +134,12 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 		pCurParsingPtr = lineEnd;
 
 		if (std::regex_search(lineStart, lineEnd, re, defineStartPartten)) {
+
+			MacroDefine newMacro;
 			// This line is a macro definition
 			if (std::regex_match(lineStart, lineEnd, re, defineParttenWithArg)) {
-
+				// This line is a valid macro define with argument(s).
+				//
 				std::string macroName = re[1].str();
 				std::string definedString = re[3].str();
 
@@ -148,22 +155,39 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 					mErrMessage = "Invalid macro define arguments.";
 					return;
 				}
-
-				defineMap[macroName].definedString = definedString;
-				defineMap[macroName].arguments = argsList;
+				
+				// TODO: 
 			}
 			else if (std::regex_match(lineStart, lineEnd, re, defineParttenWithoutArg)) {
-				// This line is a valid macro define
-				defineMap[re[1].str()].definedString = re[2].str();
+				// This line is a valid macro define without argument
+				//
+				newMacro.macroName = re[1].str();
+				newMacro.searchPartten = std::regex(std::string("\\b") + newMacro.macroName + "\\b");
+				newMacro.replacePartten = re[2].str();
+				newMacro.isRedefined = false;
+
+				
 			}
 
+			auto it = defineRefs.find(newMacro.macroName);
+			if (it != defineRefs.end()) {
+				macroDefines[it->second].isRedefined = true;
+			}
+			
+			defineRefs[newMacro.macroName] = macroDefines.size();
+			macroDefines.push_back(newMacro);
 			// Move to the next line
 			mProcessedSource += "\n";
 		}
 		else {
 			// This line is NOT macro definition, I need to handle the macro expanding.
-
-			mProcessedSource.append(lineStart, lineEnd);
+			std::string lineString(lineStart, lineEnd);
+			for (auto macro = macroDefines.rbegin(); macro != macroDefines.rend(); macro++) {
+				if ((*macro).isRedefined)
+					continue;
+				lineString = std::regex_replace(lineString, (*macro).searchPartten, (*macro).replacePartten.c_str());
+			}
+			mProcessedSource.append(lineString);
 		}
 
 	}
