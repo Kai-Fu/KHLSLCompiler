@@ -156,14 +156,12 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 					return;
 				}
 				
-				// TODO: 
 			}
 			else if (std::regex_match(lineStart, lineEnd, re, defineParttenWithoutArg)) {
 				// This line is a valid macro define without argument
 				//
 				newMacro.macroName = re[1].str();
 				newMacro.searchPartten = std::regex(std::string("\\b") + newMacro.macroName + "\\b");
-				newMacro.replacePartten = re[2].str();
 				newMacro.isRedefined = false;
 
 				
@@ -185,7 +183,6 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 			for (auto macro = macroDefines.rbegin(); macro != macroDefines.rend(); macro++) {
 				if ((*macro).isRedefined)
 					continue;
-				lineString = std::regex_replace(lineString, (*macro).searchPartten, (*macro).replacePartten.c_str());
 			}
 			mProcessedSource.append(lineString);
 		}

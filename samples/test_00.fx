@@ -44,11 +44,12 @@ float TestFunc_1(float l)
 }
 
 #define MY_VALUE 123.45
+#define MY_MUTL_ADD(xx, y, zz) (x * (y + z))
 void run_test()
 {
-
 	float res0 = TestFunc_0(2, MY_VALUE);
 	float res1 = TestFunc_1(2);
+	MY_MUTL_ADD ((res1+12.3) * 123, 456.7 + res0, 8.0123);
 	CompareTwoInt(res0*1000, res1*1000);
 }
 
