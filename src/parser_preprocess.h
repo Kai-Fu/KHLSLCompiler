@@ -15,6 +15,8 @@ namespace SC_Prep {
 
 	const char* GatherMacroArguments(const char* src, std::vector<std::string>& outArgList);
 
+	const char* ParseString(const char* src, std::string& outStr);
+
 	class Preprocessor
 	{
 	public:

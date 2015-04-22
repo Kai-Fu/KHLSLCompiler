@@ -11,6 +11,9 @@ using namespace SC_Prep;
 #define RE_Slash "\\\\"
 #define RE_Blank_Exp "[[:blank:]]+"
 #define RE_Blank_Imp "[[:blank:]]*"
+static const std::regex re_string_partten("\"(([^\"])|(\\\\.))+[^\\\\]\"");
+static const std::regex re_start_string_partten("^\"(([^\"])|(\\\\.))+[^\\\\]\"");
+
 
 Preprocessor::Preprocessor() 
 {
@@ -108,9 +111,13 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 		"#define" RE_Blank_Exp "(" RE_Token ")" RE_Blank_Exp "(.*)\n");
 
 	std::regex argExtractingPartten(
-		RE_Blank_Imp "(" RE_Token ")" RE_Blank_Imp "," );
+		RE_Blank_Imp "(" RE_Token ")" RE_Blank_Imp ",");
 
-	//std::regex defineParttenWithArg("#define[[:blank:]]+.*$");
+	std::regex dollarPartten("\\$");
+
+	std::regex leftParathesesPartten(
+		RE_Blank_Imp "(\\()" RE_Blank_Imp );
+
 	std::cmatch re;
 
 	struct MacroDefine
@@ -118,6 +125,7 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 		std::string macroName;
 		std::regex searchPartten;
 		std::string replacePartten;
+		std::vector<std::string> argumentList;
 		bool isRedefined;
 	};
 	std::vector<MacroDefine> macroDefines;
@@ -156,12 +164,19 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 					return;
 				}
 				
+				newMacro.macroName = macroName;
+				newMacro.isRedefined = false;
+				newMacro.searchPartten = std::regex(std::string("\\b") + newMacro.macroName + "\\b");
+				newMacro.replacePartten = Replace_ExcludingString(definedString, dollarPartten, "$$$$");
+				newMacro.argumentList = argsList;
+
 			}
 			else if (std::regex_match(lineStart, lineEnd, re, defineParttenWithoutArg)) {
 				// This line is a valid macro define without argument
 				//
 				newMacro.macroName = re[1].str();
 				newMacro.searchPartten = std::regex(std::string("\\b") + newMacro.macroName + "\\b");
+				newMacro.replacePartten = Replace_ExcludingString(re[2].str(), dollarPartten, "$$$$");
 				newMacro.isRedefined = false;
 
 				
@@ -183,9 +198,120 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 			for (auto macro = macroDefines.rbegin(); macro != macroDefines.rend(); macro++) {
 				if ((*macro).isRedefined)
 					continue;
+
+				if (macro->argumentList.empty())
+					lineString = Replace_ExcludingString(lineString, (*macro).searchPartten, (*macro).replacePartten);
+				else {
+					if (std::regex_search(lineStart, re, (*macro).searchPartten)) {
+
+						// Handle the macro arguments
+						//
+						const char* macroArgStart = re[0].second;
+						bool expendingSucceed = false;
+						if (std::regex_search(macroArgStart, re, leftParathesesPartten)) {
+							macroArgStart = re[1].first;
+							std::vector<std::string> argList;
+							const char* macroExpandingEnd = GatherMacroArguments(macroArgStart, argList);
+							if (macroExpandingEnd != NULL && argList.size() == (*macro).argumentList.size()) {
+								// TODO
+							}
+							expendingSucceed = true;
+						}
+						
+						if (!expendingSucceed) {
+							mErrMessage = 
+								std::string("Invalid macro arguments when trying to expanding: \"") +
+								(*macro).macroName +
+								"\"";
+							return;
+						}
+
+					}
+				}
 			}
 			mProcessedSource.append(lineString);
 		}
 
 	}
+}
+
+std::string SC_Prep::Replace_ExcludingString(const std::string & src, const std::regex & searchFor, const std::string& replaceBy)
+{
+	std::string result;
+	const char* pStart = src.c_str();
+	const char* pEnd = &src.back() + 1;
+	std::cmatch re;
+
+	bool bContinue = true;
+	while (1) {
+		const char* subEnd = pEnd;
+		if (std::regex_search(pStart, re, re_string_partten)) {
+			subEnd = re[0].first;
+		}
+		else{
+			bContinue = false;
+		}
+
+		
+		std::string subString = std::regex_replace(std::string(pStart, subEnd), searchFor, replaceBy);
+		result.append(subString);
+
+		if (!bContinue)
+			break;
+		result.append(re[0].first, re[0].second);
+		pStart = re[0].second;
+	}
+	return result;
+}
+
+const char* SC_Prep::GatherMacroArguments(const char* src, std::vector<std::string>& outArgList)
+{
+	const char* pCur = src;
+	int pairCnt = 0;
+	std::string pendingArg;
+	do {
+		if (*pCur == '(')
+			pairCnt++;
+		else if (*pCur == ')')
+			pairCnt--;
+
+		if (*pCur == '\"') {
+			std::string temp;
+			pCur = ParseString(pCur, temp);
+		}
+		else if (*pCur == ',' && pairCnt == 1) {
+			outArgList.push_back(std::move(pendingArg));
+		}
+		else if (pairCnt > 0) {
+			pendingArg.push_back(*pCur);
+		}
+
+		pCur++;
+	} while (*pCur != '\0' && pairCnt > 0);
+
+	if (!pendingArg.empty())
+		outArgList.push_back(std::move(pendingArg));
+
+	return (pairCnt == 0 ? pCur : NULL);
+}
+
+const char * SC_Prep::ParseString(const char * src, std::string& outStr)
+{
+	const char* pStart = src;
+	std::cmatch re;
+	while (1) {
+		const char* strEnd = NULL;
+		if (std::regex_search(pStart, re, re_start_string_partten)) {
+			strEnd = re[0].second;
+			outStr.append(pStart, strEnd);
+			pStart = strEnd;
+		}
+		else 
+			break;
+
+		while (*pStart == ' ' || *pStart == '\t' || *pStart == '\n')
+			++pStart;
+		
+	}
+	return pStart;
 }
