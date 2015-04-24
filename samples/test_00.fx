@@ -44,7 +44,7 @@ float TestFunc_1(float l)
 }
 
 #define MY_VALUE 123.45
-#define MY_MUTL_ADD(xx, y, zz) (x * (y + z))
+#define MY_MUTL_ADD(xx, y, zz) (xx * (y + zz))
 void run_test()
 {
 	float res0 = TestFunc_0(2, MY_VALUE);

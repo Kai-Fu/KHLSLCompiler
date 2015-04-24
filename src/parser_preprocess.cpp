@@ -167,7 +167,10 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 				newMacro.macroName = macroName;
 				newMacro.isRedefined = false;
 				newMacro.searchPartten = std::regex(std::string("\\b") + newMacro.macroName + "\\b");
-				newMacro.replacePartten = Replace_ExcludingString(definedString, dollarPartten, "$$$$");
+				for (auto& arg : argsList) {
+					definedString = std::regex_replace(definedString, std::regex(std::string("\\b(##)?") + arg + "(##)?\\b"), std::string("##") + arg + "##");
+				}
+				newMacro.replacePartten = definedString;
 				newMacro.argumentList = argsList;
 
 			}
@@ -176,7 +179,7 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 				//
 				newMacro.macroName = re[1].str();
 				newMacro.searchPartten = std::regex(std::string("\\b") + newMacro.macroName + "\\b");
-				newMacro.replacePartten = Replace_ExcludingString(re[2].str(), dollarPartten, "$$$$");
+				newMacro.replacePartten = re[2].str();
 				newMacro.isRedefined = false;
 
 				
@@ -194,28 +197,42 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 		}
 		else {
 			// This line is NOT macro definition, I need to handle the macro expanding.
-			std::string lineString(lineStart, lineEnd);
+			std::string lineString;
+			size_t extraLines = 0;
 			for (auto macro = macroDefines.rbegin(); macro != macroDefines.rend(); macro++) {
 				if ((*macro).isRedefined)
 					continue;
 
-				if (macro->argumentList.empty())
+				if (macro->argumentList.empty()) {
+					lineString.append(lineStart, lineEnd);
 					lineString = Replace_ExcludingString(lineString, (*macro).searchPartten, (*macro).replacePartten);
+				}
 				else {
-					if (std::regex_search(lineStart, re, (*macro).searchPartten)) {
+					while (std::regex_search(lineStart, lineEnd, re, (*macro).searchPartten)) {
 
+						lineString.append(lineStart, re[0].first);
 						// Handle the macro arguments
 						//
 						const char* macroArgStart = re[0].second;
 						bool expendingSucceed = false;
 						if (std::regex_search(macroArgStart, re, leftParathesesPartten)) {
-							macroArgStart = re[1].first;
+							const char* macroArgStart_p = re[1].first;
 							std::vector<std::string> argList;
-							const char* macroExpandingEnd = GatherMacroArguments(macroArgStart, argList);
+							const char* macroExpandingEnd = GatherMacroArguments(macroArgStart_p, argList);
+							std::string expanedMacro = (*macro).replacePartten;
 							if (macroExpandingEnd != NULL && argList.size() == (*macro).argumentList.size()) {
-								// TODO
+								for (size_t i = 0; i < argList.size(); ++i) {
+									std::regex tokenReplacePartten(std::string("##") + (*macro).argumentList[i] + "##");
+									expanedMacro = std::regex_replace(expanedMacro, tokenReplacePartten, argList[i]);
+								}
+
+								extraLines += std::count(macroArgStart, macroExpandingEnd, '\n');
+								pCurParsingPtr = macroExpandingEnd;
+								lineStart = pCurParsingPtr;
+								lineString.append(expanedMacro);
+								expendingSucceed = true;
 							}
-							expendingSucceed = true;
+							
 						}
 						
 						if (!expendingSucceed) {
@@ -230,6 +247,7 @@ void SC_Prep::DefineHandler::DoIt(const char * source)
 				}
 			}
 			mProcessedSource.append(lineString);
+			for (size_t i = 0; i < extraLines; ++i) mProcessedSource.push_back('\n');
 		}
 
 	}
